@@ -21,12 +21,12 @@
 
 #include <google/protobuf/arena.h>
 #include <google/protobuf/arenastring.h>
+#include <google/protobuf/generated_message_util.h>
+#include <google/protobuf/metadata.h>
+#include <google/protobuf/message.h>
+#include <google/protobuf/repeated_field.h>
 #include <google/protobuf/extension_set.h>
 #include <google/protobuf/generated_enum_reflection.h>
-#include <google/protobuf/generated_message_util.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/metadata.h>
-#include <google/protobuf/repeated_field.h>
 #include <google/protobuf/unknown_field_set.h>
 // @@protoc_insertion_point(includes)
 
@@ -46,7 +46,10 @@ class Message;
 class Snapshot;
 class SnapshotMetadata;
 
-enum EntryType { EntryNormal = 0, EntryConfChange = 1 };
+enum EntryType {
+  EntryNormal = 0,
+  EntryConfChange = 1
+};
 bool EntryType_IsValid(int value);
 const EntryType EntryType_MIN = EntryNormal;
 const EntryType EntryType_MAX = EntryConfChange;
@@ -54,11 +57,13 @@ const int EntryType_ARRAYSIZE = EntryType_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* EntryType_descriptor();
 inline const ::std::string& EntryType_Name(EntryType value) {
-  return ::google::protobuf::internal::NameOfEnum(EntryType_descriptor(), value);
+  return ::google::protobuf::internal::NameOfEnum(
+    EntryType_descriptor(), value);
 }
-inline bool EntryType_Parse(const ::std::string& name, EntryType* value) {
-  return ::google::protobuf::internal::ParseNamedEnum<EntryType>(EntryType_descriptor(), name,
-                                                                 value);
+inline bool EntryType_Parse(
+    const ::std::string& name, EntryType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<EntryType>(
+    EntryType_descriptor(), name, value);
 }
 enum MessageType {
   MsgHup = 0,
@@ -88,13 +93,19 @@ const int MessageType_ARRAYSIZE = MessageType_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* MessageType_descriptor();
 inline const ::std::string& MessageType_Name(MessageType value) {
-  return ::google::protobuf::internal::NameOfEnum(MessageType_descriptor(), value);
+  return ::google::protobuf::internal::NameOfEnum(
+    MessageType_descriptor(), value);
 }
-inline bool MessageType_Parse(const ::std::string& name, MessageType* value) {
-  return ::google::protobuf::internal::ParseNamedEnum<MessageType>(MessageType_descriptor(), name,
-                                                                   value);
+inline bool MessageType_Parse(
+    const ::std::string& name, MessageType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<MessageType>(
+    MessageType_descriptor(), name, value);
 }
-enum ConfChangeType { ConfChangeAddNode = 0, ConfChangeRemoveNode = 1, ConfChangeUpdateNode = 2 };
+enum ConfChangeType {
+  ConfChangeAddNode = 0,
+  ConfChangeRemoveNode = 1,
+  ConfChangeUpdateNode = 2
+};
 bool ConfChangeType_IsValid(int value);
 const ConfChangeType ConfChangeType_MIN = ConfChangeAddNode;
 const ConfChangeType ConfChangeType_MAX = ConfChangeUpdateNode;
@@ -102,16 +113,17 @@ const int ConfChangeType_ARRAYSIZE = ConfChangeType_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* ConfChangeType_descriptor();
 inline const ::std::string& ConfChangeType_Name(ConfChangeType value) {
-  return ::google::protobuf::internal::NameOfEnum(ConfChangeType_descriptor(), value);
+  return ::google::protobuf::internal::NameOfEnum(
+    ConfChangeType_descriptor(), value);
 }
-inline bool ConfChangeType_Parse(const ::std::string& name, ConfChangeType* value) {
-  return ::google::protobuf::internal::ParseNamedEnum<ConfChangeType>(ConfChangeType_descriptor(),
-                                                                      name, value);
+inline bool ConfChangeType_Parse(
+    const ::std::string& name, ConfChangeType* value) {
+  return ::google::protobuf::internal::ParseNamedEnum<ConfChangeType>(
+    ConfChangeType_descriptor(), name, value);
 }
 // ===================================================================
 
-class Entry : public ::google::protobuf::
-                  Message /* @@protoc_insertion_point(class_definition:yaraft.pb.Entry) */ {
+class Entry : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.Entry) */ {
  public:
   Entry();
   virtual ~Entry();
@@ -138,9 +150,7 @@ class Entry : public ::google::protobuf::
 
   // implements Message ----------------------------------------------
 
-  inline Entry* New() const {
-    return New(NULL);
-  }
+  inline Entry* New() const { return New(NULL); }
 
   Entry* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -151,33 +161,30 @@ class Entry : public ::google::protobuf::
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(Entry* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -235,7 +242,7 @@ class Entry : public ::google::protobuf::
   ::google::protobuf::uint64 index_;
   ::google::protobuf::internal::ArenaStringPtr data_;
   int type_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -244,9 +251,7 @@ class Entry : public ::google::protobuf::
 };
 // -------------------------------------------------------------------
 
-class SnapshotMetadata
-    : public ::google::protobuf::
-          Message /* @@protoc_insertion_point(class_definition:yaraft.pb.SnapshotMetadata) */ {
+class SnapshotMetadata : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.SnapshotMetadata) */ {
  public:
   SnapshotMetadata();
   virtual ~SnapshotMetadata();
@@ -273,9 +278,7 @@ class SnapshotMetadata
 
   // implements Message ----------------------------------------------
 
-  inline SnapshotMetadata* New() const {
-    return New(NULL);
-  }
+  inline SnapshotMetadata* New() const { return New(NULL); }
 
   SnapshotMetadata* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -286,33 +289,30 @@ class SnapshotMetadata
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(SnapshotMetadata* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -357,7 +357,7 @@ class SnapshotMetadata
   ::yaraft::pb::ConfState* conf_state_;
   ::google::protobuf::uint64 index_;
   ::google::protobuf::uint64 term_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -366,8 +366,7 @@ class SnapshotMetadata
 };
 // -------------------------------------------------------------------
 
-class Snapshot : public ::google::protobuf::
-                     Message /* @@protoc_insertion_point(class_definition:yaraft.pb.Snapshot) */ {
+class Snapshot : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.Snapshot) */ {
  public:
   Snapshot();
   virtual ~Snapshot();
@@ -394,9 +393,7 @@ class Snapshot : public ::google::protobuf::
 
   // implements Message ----------------------------------------------
 
-  inline Snapshot* New() const {
-    return New(NULL);
-  }
+  inline Snapshot* New() const { return New(NULL); }
 
   Snapshot* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -407,33 +404,30 @@ class Snapshot : public ::google::protobuf::
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(Snapshot* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -473,7 +467,7 @@ class Snapshot : public ::google::protobuf::
   mutable int _cached_size_;
   ::google::protobuf::internal::ArenaStringPtr data_;
   ::yaraft::pb::SnapshotMetadata* metadata_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -482,8 +476,7 @@ class Snapshot : public ::google::protobuf::
 };
 // -------------------------------------------------------------------
 
-class Message : public ::google::protobuf::
-                    Message /* @@protoc_insertion_point(class_definition:yaraft.pb.Message) */ {
+class Message : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.Message) */ {
  public:
   Message();
   virtual ~Message();
@@ -510,9 +503,7 @@ class Message : public ::google::protobuf::
 
   // implements Message ----------------------------------------------
 
-  inline Message* New() const {
-    return New(NULL);
-  }
+  inline Message* New() const { return New(NULL); }
 
   Message* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -523,33 +514,30 @@ class Message : public ::google::protobuf::
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(Message* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -605,8 +593,10 @@ class Message : public ::google::protobuf::
   const ::yaraft::pb::Entry& entries(int index) const;
   ::yaraft::pb::Entry* mutable_entries(int index);
   ::yaraft::pb::Entry* add_entries();
-  ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry>* mutable_entries();
-  const ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry>& entries() const;
+  ::google::protobuf::RepeatedPtrField< ::yaraft::pb::Entry >*
+      mutable_entries();
+  const ::google::protobuf::RepeatedPtrField< ::yaraft::pb::Entry >&
+      entries() const;
 
   // optional uint64 commit = 8;
   bool has_commit() const;
@@ -685,12 +675,12 @@ class Message : public ::google::protobuf::
   int type_;
   bool reject_;
   ::google::protobuf::uint64 index_;
-  ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry> entries_;
+  ::google::protobuf::RepeatedPtrField< ::yaraft::pb::Entry > entries_;
   ::google::protobuf::uint64 commit_;
   ::yaraft::pb::Snapshot* snapshot_;
   ::google::protobuf::uint64 rejecthint_;
   ::google::protobuf::internal::ArenaStringPtr context_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -699,8 +689,7 @@ class Message : public ::google::protobuf::
 };
 // -------------------------------------------------------------------
 
-class HardState : public ::google::protobuf::
-                      Message /* @@protoc_insertion_point(class_definition:yaraft.pb.HardState) */ {
+class HardState : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.HardState) */ {
  public:
   HardState();
   virtual ~HardState();
@@ -727,9 +716,7 @@ class HardState : public ::google::protobuf::
 
   // implements Message ----------------------------------------------
 
-  inline HardState* New() const {
-    return New(NULL);
-  }
+  inline HardState* New() const { return New(NULL); }
 
   HardState* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -740,33 +727,30 @@ class HardState : public ::google::protobuf::
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(HardState* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -809,7 +793,7 @@ class HardState : public ::google::protobuf::
   ::google::protobuf::uint64 term_;
   ::google::protobuf::uint64 vote_;
   ::google::protobuf::uint64 commit_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -818,8 +802,7 @@ class HardState : public ::google::protobuf::
 };
 // -------------------------------------------------------------------
 
-class ConfState : public ::google::protobuf::
-                      Message /* @@protoc_insertion_point(class_definition:yaraft.pb.ConfState) */ {
+class ConfState : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.ConfState) */ {
  public:
   ConfState();
   virtual ~ConfState();
@@ -846,9 +829,7 @@ class ConfState : public ::google::protobuf::
 
   // implements Message ----------------------------------------------
 
-  inline ConfState* New() const {
-    return New(NULL);
-  }
+  inline ConfState* New() const { return New(NULL); }
 
   ConfState* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -859,33 +840,30 @@ class ConfState : public ::google::protobuf::
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(ConfState* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -899,16 +877,19 @@ class ConfState : public ::google::protobuf::
   ::google::protobuf::uint64 nodes(int index) const;
   void set_nodes(int index, ::google::protobuf::uint64 value);
   void add_nodes(::google::protobuf::uint64 value);
-  const ::google::protobuf::RepeatedField<::google::protobuf::uint64>& nodes() const;
-  ::google::protobuf::RepeatedField<::google::protobuf::uint64>* mutable_nodes();
+  const ::google::protobuf::RepeatedField< ::google::protobuf::uint64 >&
+      nodes() const;
+  ::google::protobuf::RepeatedField< ::google::protobuf::uint64 >*
+      mutable_nodes();
 
   // @@protoc_insertion_point(class_scope:yaraft.pb.ConfState)
  private:
+
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::uint32 _has_bits_[1];
   mutable int _cached_size_;
-  ::google::protobuf::RepeatedField<::google::protobuf::uint64> nodes_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  ::google::protobuf::RepeatedField< ::google::protobuf::uint64 > nodes_;
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -917,9 +898,7 @@ class ConfState : public ::google::protobuf::
 };
 // -------------------------------------------------------------------
 
-class ConfChange
-    : public ::google::protobuf::
-          Message /* @@protoc_insertion_point(class_definition:yaraft.pb.ConfChange) */ {
+class ConfChange : public ::google::protobuf::Message /* @@protoc_insertion_point(class_definition:yaraft.pb.ConfChange) */ {
  public:
   ConfChange();
   virtual ~ConfChange();
@@ -946,9 +925,7 @@ class ConfChange
 
   // implements Message ----------------------------------------------
 
-  inline ConfChange* New() const {
-    return New(NULL);
-  }
+  inline ConfChange* New() const { return New(NULL); }
 
   ConfChange* New(::google::protobuf::Arena* arena) const;
   void CopyFrom(const ::google::protobuf::Message& from);
@@ -959,33 +936,30 @@ class ConfChange
   bool IsInitialized() const;
 
   int ByteSize() const;
-  bool MergePartialFromCodedStream(::google::protobuf::io::CodedInputStream* input);
-  void SerializeWithCachedSizes(::google::protobuf::io::CodedOutputStream* output) const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
   ::google::protobuf::uint8* InternalSerializeWithCachedSizesToArray(
       bool deterministic, ::google::protobuf::uint8* output) const;
-  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(
-      ::google::protobuf::uint8* output) const {
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const {
     return InternalSerializeWithCachedSizesToArray(false, output);
   }
-  int GetCachedSize() const {
-    return _cached_size_;
-  }
-
- private:
+  int GetCachedSize() const { return _cached_size_; }
+  private:
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const;
   void InternalSwap(ConfChange* other);
-
- private:
+  private:
   inline ::google::protobuf::Arena* GetArenaNoVirtual() const {
     return _internal_metadata_.arena();
   }
   inline void* MaybeArenaPtr() const {
     return _internal_metadata_.raw_arena_ptr();
   }
+  public:
 
- public:
   ::google::protobuf::Metadata GetMetadata() const;
 
   // nested types ----------------------------------------------------
@@ -1043,7 +1017,7 @@ class ConfChange
   ::google::protobuf::uint64 nodeid_;
   ::google::protobuf::internal::ArenaStringPtr context_;
   int type_;
-  friend void protobuf_AddDesc_raftpb_2eproto();
+  friend void  protobuf_AddDesc_raftpb_2eproto();
   friend void protobuf_AssignDesc_raftpb_2eproto();
   friend void protobuf_ShutdownFile_raftpb_2eproto();
 
@@ -1051,6 +1025,7 @@ class ConfChange
   static ConfChange* default_instance_;
 };
 // ===================================================================
+
 
 // ===================================================================
 
@@ -1121,7 +1096,7 @@ inline void Entry::clear_type() {
 }
 inline ::yaraft::pb::EntryType Entry::type() const {
   // @@protoc_insertion_point(field_get:yaraft.pb.Entry.Type)
-  return static_cast<::yaraft::pb::EntryType>(type_);
+  return static_cast< ::yaraft::pb::EntryType >(type_);
 }
 inline void Entry::set_type(::yaraft::pb::EntryType value) {
   assert(::yaraft::pb::EntryType_IsValid(value));
@@ -1155,14 +1130,13 @@ inline void Entry::set_data(const ::std::string& value) {
 }
 inline void Entry::set_data(const char* value) {
   set_has_data();
-  data_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                   ::std::string(value));
+  data_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:yaraft.pb.Entry.Data)
 }
 inline void Entry::set_data(const void* value, size_t size) {
   set_has_data();
   data_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                   ::std::string(reinterpret_cast<const char*>(value), size));
+      ::std::string(reinterpret_cast<const char*>(value), size));
   // @@protoc_insertion_point(field_set_pointer:yaraft.pb.Entry.Data)
 }
 inline ::std::string* Entry::mutable_data() {
@@ -1200,8 +1174,7 @@ inline void SnapshotMetadata::clear_has_conf_state() {
   _has_bits_[0] &= ~0x00000001u;
 }
 inline void SnapshotMetadata::clear_conf_state() {
-  if (conf_state_ != NULL)
-    conf_state_->::yaraft::pb::ConfState::Clear();
+  if (conf_state_ != NULL) conf_state_->::yaraft::pb::ConfState::Clear();
   clear_has_conf_state();
 }
 inline const ::yaraft::pb::ConfState& SnapshotMetadata::conf_state() const {
@@ -1311,14 +1284,13 @@ inline void Snapshot::set_data(const ::std::string& value) {
 }
 inline void Snapshot::set_data(const char* value) {
   set_has_data();
-  data_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                   ::std::string(value));
+  data_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:yaraft.pb.Snapshot.data)
 }
 inline void Snapshot::set_data(const void* value, size_t size) {
   set_has_data();
   data_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                   ::std::string(reinterpret_cast<const char*>(value), size));
+      ::std::string(reinterpret_cast<const char*>(value), size));
   // @@protoc_insertion_point(field_set_pointer:yaraft.pb.Snapshot.data)
 }
 inline ::std::string* Snapshot::mutable_data() {
@@ -1352,8 +1324,7 @@ inline void Snapshot::clear_has_metadata() {
   _has_bits_[0] &= ~0x00000002u;
 }
 inline void Snapshot::clear_metadata() {
-  if (metadata_ != NULL)
-    metadata_->::yaraft::pb::SnapshotMetadata::Clear();
+  if (metadata_ != NULL) metadata_->::yaraft::pb::SnapshotMetadata::Clear();
   clear_has_metadata();
 }
 inline const ::yaraft::pb::SnapshotMetadata& Snapshot::metadata() const {
@@ -1406,7 +1377,7 @@ inline void Message::clear_type() {
 }
 inline ::yaraft::pb::MessageType Message::type() const {
   // @@protoc_insertion_point(field_get:yaraft.pb.Message.type)
-  return static_cast<::yaraft::pb::MessageType>(type_);
+  return static_cast< ::yaraft::pb::MessageType >(type_);
 }
 inline void Message::set_type(::yaraft::pb::MessageType value) {
   assert(::yaraft::pb::MessageType_IsValid(value));
@@ -1554,11 +1525,13 @@ inline ::yaraft::pb::Entry* Message::add_entries() {
   // @@protoc_insertion_point(field_add:yaraft.pb.Message.entries)
   return entries_.Add();
 }
-inline ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry>* Message::mutable_entries() {
+inline ::google::protobuf::RepeatedPtrField< ::yaraft::pb::Entry >*
+Message::mutable_entries() {
   // @@protoc_insertion_point(field_mutable_list:yaraft.pb.Message.entries)
   return &entries_;
 }
-inline const ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry>& Message::entries() const {
+inline const ::google::protobuf::RepeatedPtrField< ::yaraft::pb::Entry >&
+Message::entries() const {
   // @@protoc_insertion_point(field_list:yaraft.pb.Message.entries)
   return entries_;
 }
@@ -1598,8 +1571,7 @@ inline void Message::clear_has_snapshot() {
   _has_bits_[0] &= ~0x00000100u;
 }
 inline void Message::clear_snapshot() {
-  if (snapshot_ != NULL)
-    snapshot_->::yaraft::pb::Snapshot::Clear();
+  if (snapshot_ != NULL) snapshot_->::yaraft::pb::Snapshot::Clear();
   clear_has_snapshot();
 }
 inline const ::yaraft::pb::Snapshot& Message::snapshot() const {
@@ -1705,14 +1677,13 @@ inline void Message::set_context(const ::std::string& value) {
 }
 inline void Message::set_context(const char* value) {
   set_has_context();
-  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                      ::std::string(value));
+  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:yaraft.pb.Message.context)
 }
 inline void Message::set_context(const void* value, size_t size) {
   set_has_context();
   context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                      ::std::string(reinterpret_cast<const char*>(value), size));
+      ::std::string(reinterpret_cast<const char*>(value), size));
   // @@protoc_insertion_point(field_set_pointer:yaraft.pb.Message.context)
 }
 inline ::std::string* Message::mutable_context() {
@@ -1731,8 +1702,7 @@ inline void Message::set_allocated_context(::std::string* context) {
   } else {
     clear_has_context();
   }
-  context_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                               context);
+  context_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), context);
   // @@protoc_insertion_point(field_set_allocated:yaraft.pb.Message.context)
 }
 
@@ -1835,12 +1805,13 @@ inline void ConfState::add_nodes(::google::protobuf::uint64 value) {
   nodes_.Add(value);
   // @@protoc_insertion_point(field_add:yaraft.pb.ConfState.nodes)
 }
-inline const ::google::protobuf::RepeatedField<::google::protobuf::uint64>& ConfState::nodes()
-    const {
+inline const ::google::protobuf::RepeatedField< ::google::protobuf::uint64 >&
+ConfState::nodes() const {
   // @@protoc_insertion_point(field_list:yaraft.pb.ConfState.nodes)
   return nodes_;
 }
-inline ::google::protobuf::RepeatedField<::google::protobuf::uint64>* ConfState::mutable_nodes() {
+inline ::google::protobuf::RepeatedField< ::google::protobuf::uint64 >*
+ConfState::mutable_nodes() {
   // @@protoc_insertion_point(field_mutable_list:yaraft.pb.ConfState.nodes)
   return &nodes_;
 }
@@ -1889,7 +1860,7 @@ inline void ConfChange::clear_type() {
 }
 inline ::yaraft::pb::ConfChangeType ConfChange::type() const {
   // @@protoc_insertion_point(field_get:yaraft.pb.ConfChange.Type)
-  return static_cast<::yaraft::pb::ConfChangeType>(type_);
+  return static_cast< ::yaraft::pb::ConfChangeType >(type_);
 }
 inline void ConfChange::set_type(::yaraft::pb::ConfChangeType value) {
   assert(::yaraft::pb::ConfChangeType_IsValid(value));
@@ -1947,14 +1918,13 @@ inline void ConfChange::set_context(const ::std::string& value) {
 }
 inline void ConfChange::set_context(const char* value) {
   set_has_context();
-  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                      ::std::string(value));
+  context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
   // @@protoc_insertion_point(field_set_char:yaraft.pb.ConfChange.Context)
 }
 inline void ConfChange::set_context(const void* value, size_t size) {
   set_has_context();
   context_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                      ::std::string(reinterpret_cast<const char*>(value), size));
+      ::std::string(reinterpret_cast<const char*>(value), size));
   // @@protoc_insertion_point(field_set_pointer:yaraft.pb.ConfChange.Context)
 }
 inline ::std::string* ConfChange::mutable_context() {
@@ -1973,8 +1943,7 @@ inline void ConfChange::set_allocated_context(::std::string* context) {
   } else {
     clear_has_context();
   }
-  context_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
-                               context);
+  context_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), context);
   // @@protoc_insertion_point(field_set_allocated:yaraft.pb.ConfChange.Context)
 }
 
@@ -1991,6 +1960,7 @@ inline void ConfChange::set_allocated_context(::std::string* context) {
 
 // -------------------------------------------------------------------
 
+
 // @@protoc_insertion_point(namespace_scope)
 
 }  // namespace pb
@@ -2000,22 +1970,19 @@ inline void ConfChange::set_allocated_context(::std::string* context) {
 namespace google {
 namespace protobuf {
 
+template <> struct is_proto_enum< ::yaraft::pb::EntryType> : ::google::protobuf::internal::true_type {};
 template <>
-struct is_proto_enum<::yaraft::pb::EntryType> : ::google::protobuf::internal::true_type {};
-template <>
-inline const EnumDescriptor* GetEnumDescriptor<::yaraft::pb::EntryType>() {
+inline const EnumDescriptor* GetEnumDescriptor< ::yaraft::pb::EntryType>() {
   return ::yaraft::pb::EntryType_descriptor();
 }
+template <> struct is_proto_enum< ::yaraft::pb::MessageType> : ::google::protobuf::internal::true_type {};
 template <>
-struct is_proto_enum<::yaraft::pb::MessageType> : ::google::protobuf::internal::true_type {};
-template <>
-inline const EnumDescriptor* GetEnumDescriptor<::yaraft::pb::MessageType>() {
+inline const EnumDescriptor* GetEnumDescriptor< ::yaraft::pb::MessageType>() {
   return ::yaraft::pb::MessageType_descriptor();
 }
+template <> struct is_proto_enum< ::yaraft::pb::ConfChangeType> : ::google::protobuf::internal::true_type {};
 template <>
-struct is_proto_enum<::yaraft::pb::ConfChangeType> : ::google::protobuf::internal::true_type {};
-template <>
-inline const EnumDescriptor* GetEnumDescriptor<::yaraft::pb::ConfChangeType>() {
+inline const EnumDescriptor* GetEnumDescriptor< ::yaraft::pb::ConfChangeType>() {
   return ::yaraft::pb::ConfChangeType_descriptor();
 }
 

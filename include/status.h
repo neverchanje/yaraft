@@ -68,12 +68,15 @@ class StatusWith {
   StatusWith(Error::ErrorCodes code, const silly::Slice& reason)
       : StatusWith(Status::Make(code, reason)) {}
 
+  StatusWith(Error::ErrorCodes code) : StatusWith(Status::Make(code, nullptr)) {}
+
   const T& GetValue() const {
     assert(status_.IsOK());
     return *value_;
   }
 
   T& GetValue() {
+    assert(status_.IsOK());
     return *value_;
   }
 

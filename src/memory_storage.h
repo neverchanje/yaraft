@@ -15,13 +15,15 @@
 
 #pragma once
 
-#include <glog/logging.h>
 #include <mutex>
 #include <vector>
 
 #include "raftpb.pb.h"
 #include "status.h"
 #include "storage.h"
+
+#include <glog/logging.h>
+#include <silly/disallow_copying.h>
 
 namespace yaraft {
 
@@ -30,7 +32,13 @@ namespace yaraft {
 //
 // Thread-safe.
 class MemoryStorage : public Storage {
+  __DISALLOW_COPYING__(MemoryStorage);
+
  public:
+  // NOTE: Except for MemoryStorage::Term, all operations on MemoryStorage is not allowed to place
+  // an index beyond LastIndex(), it'll panic when this happens. But index is allowed to be pointed
+  // before FirstIndex(), it'll return error status though, but it's deterministic.
+  // The point is: we can request to read stale data, but we cannot read data that does not exist.
   virtual StatusWith<uint64_t> Term(uint64_t i) const override {
     std::lock_guard<std::mutex> guard(mu_);
 
@@ -63,17 +71,41 @@ class MemoryStorage : public Storage {
   }
 
   virtual StatusWith<std::vector<pb::Entry>> Entries(uint64_t lo, uint64_t hi,
-                                                     uint64_t maxSize) override {}
+                                                     uint64_t maxSize) override {
+    using StatusWithEntryVec = StatusWith<std::vector<pb::Entry>>;
+
+    DLOG_ASSERT(lo <= hi);
+
+    std::lock_guard<std::mutex> guard(mu_);
+    if (lo <= entries_.begin()->index()) {
+      return Status::Make(Error::LogCompacted);
+    }
+
+    LOG_ASSERT(hi - 1 <= entries_.rbegin()->index());
+
+    if (entries_.size() == 1) {
+      // contains only a dummy entry
+      return StatusWithEntryVec(Error::Overflow);
+    }
+
+    std::vector<pb::Entry> ret;
+    ret.reserve(hi - lo + 1);
+    uint64_t beginIndex = entries_.begin()->index();
+
+    size_t size = 0;
+    for (int i = lo - beginIndex; i < hi - beginIndex; i++) {
+      size += i;
+      ret.push_back(entries_[i]);
+      if (size > maxSize)
+        break;
+    }
+    return StatusWithEntryVec(ret);
+  }
 
  public:
-  MemoryStorage() {}
-
-  static MemoryStorage *Create() {
-    auto tmp = new MemoryStorage();
+  MemoryStorage() {
     // When starting from scratch populate the list with a dummy entry at term zero.
-    // TODO: I've no idea what this dummy entry is used for.
-    tmp->entries_.push_back(pb::Entry());
-    return tmp;
+    entries_.push_back(pb::Entry());
   }
 
   // Compact discards all log entries prior to compactIndex.
@@ -115,7 +147,7 @@ class MemoryStorage : public Storage {
   StatusWith<pb::Snapshot *> CreateSnapshot(uint64_t i, pb::ConfState *cs, char data[]) const {
     std::lock_guard<std::mutex> guard(mu_);
     if (i <= snapshot_.metadata().index()) {
-      return StatusWith<pb::Snapshot *>(Status::Make(Error::SnapshotOutOfDate));
+      return StatusWith<pb::Snapshot *>(Error::SnapshotOutOfDate);
     }
     if (cs) {
     }
@@ -123,9 +155,16 @@ class MemoryStorage : public Storage {
   }
 
  public:
-  // for test only
+  /// The following functions are for test only.
+
   std::vector<pb::Entry> &TEST_Entries() {
     return entries_;
+  }
+
+  static MemoryStorage *TEST_Empty() {
+    auto tmp = new MemoryStorage();
+    tmp->entries_.clear();
+    return tmp;
   }
 
  private:

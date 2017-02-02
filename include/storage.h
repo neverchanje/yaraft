@@ -37,6 +37,7 @@ class Storage {
   // [FirstIndex()-1, LastIndex()]. The term of the entry before
   // FirstIndex is retained for matching purposes even though the
   // rest of that entry may not be available.
+  // TODO: What is the matching purposes mean?
   virtual StatusWith<uint64_t> Term(uint64_t i) const = 0;
 
   // LastIndex returns the index of the last entry in the log.
@@ -57,6 +58,8 @@ class Storage {
   // Entries returns a slice of log entries in the range [lo,hi).
   // MaxSize limits the total size of the log entries returned, but
   // Entries returns at least one entry if any.
+  // TODO: I don't think it's a good interface in C++. Data in the range will be copied out, rather
+  // than reference counted.
   virtual StatusWith<std::vector<pb::Entry>> Entries(uint64_t lo, uint64_t hi,
                                                      uint64_t maxSize) = 0;
 };
