@@ -89,16 +89,19 @@ class MemoryStorage : public Storage {
     }
 
     std::vector<pb::Entry> ret;
-    ret.reserve(hi - lo + 1);
-    uint64_t beginIndex = entries_.begin()->index();
+    ret.reserve(hi - lo);
+    uint64_t loOffset = lo - entries_.begin()->index();
 
-    size_t size = 0;
-    for (int i = lo - beginIndex; i < hi - beginIndex; i++) {
-      size += i;
-      ret.push_back(entries_[i]);
+    ret.push_back(entries_[loOffset]);
+    uint64_t size = entries_[loOffset].ByteSize();
+
+    for (int i = 1; i < hi - lo; i++) {
+      size += entries_[i + loOffset].ByteSize();
       if (size > maxSize)
         break;
+      ret.push_back(entries_[i + loOffset]);
     }
+
     return StatusWithEntryVec(ret);
   }
 
