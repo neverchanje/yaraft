@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include <boost/optional.hpp>
 #include <silly/status.h>
 
@@ -20,9 +22,11 @@ namespace yaraft {
 class Error {
  public:
   enum ErrorCodes {
+    OK,
 
     LogCompacted,
     SnapshotOutOfDate,
+    Overflow,
 
     // number of error codes
     ErrorCodesNum
@@ -32,15 +36,17 @@ class Error {
   friend class silly::Status<Error, Error::ErrorCodes>;
 
   static inline std::string toString(unsigned int errorCode) {
-#ifndef(ERROR_CODE_DESCRIPT)
+#ifndef ERROR_CODE_DESCRIPT
 #define ERROR_CODE_DESCRIPT(err) \
   case (err):                    \
     return #err
-
+#endif
     ErrorCodes code = static_cast<ErrorCodes>(errorCode);
     switch (code) {
+      ERROR_CODE_DESCRIPT(OK);
       ERROR_CODE_DESCRIPT(LogCompacted);
       ERROR_CODE_DESCRIPT(SnapshotOutOfDate);
+      ERROR_CODE_DESCRIPT(Overflow);
       default:
         return "Unknown";
     }

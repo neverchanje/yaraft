@@ -15,9 +15,9 @@
 
 #pragma once
 
-#include <deque>
 #include <glog/logging.h>
 #include <mutex>
+#include <vector>
 
 #include "raftpb.pb.h"
 #include "status.h"
@@ -34,12 +34,17 @@ class MemoryStorage : public Storage {
   virtual StatusWith<uint64_t> Term(uint64_t i) const override {
     std::lock_guard<std::mutex> guard(mu_);
 
-    if (i < entries_.begin()->index()) {
+    auto beginIndex = entries_.begin()->index();
+
+    if (i <= beginIndex) {
       return Status::Make(Error::LogCompacted);
     }
 
-    if (i > entries_.size()) {
+    if (i > entries_.rbegin()->index()) {
+      return Status::Make(Error::Overflow);
     }
+
+    return StatusWith<uint64_t>(entries_[i - beginIndex].term());
   }
 
   virtual StatusWith<uint64_t> FirstIndex() const override {
@@ -61,25 +66,39 @@ class MemoryStorage : public Storage {
                                                      uint64_t maxSize) override {}
 
  public:
-  MemoryStorage() {
+  MemoryStorage() {}
+
+  static MemoryStorage *Create() {
+    auto tmp = new MemoryStorage();
     // When starting from scratch populate the list with a dummy entry at term zero.
     // TODO: I've no idea what this dummy entry is used for.
-    entries_.push_back(pb::Entry());
+    tmp->entries_.push_back(pb::Entry());
+    return tmp;
   }
 
   // Compact discards all log entries prior to compactIndex.
   // It is the application's responsibility to not attempt to compact an index
   // greater than raftLog.applied.
   Status Compact(uint64_t compactIndex) {
-    auto offset = entries_.begin()->index();
-    if (compactIndex <= offset) {
+    uint64_t beginIndex = entries_.begin()->index();
+    if (compactIndex <= beginIndex) {
       return Status::Make(Error::LogCompacted);
     }
     LOG_ASSERT(compactIndex <= entries_.rbegin()->index());
 
-    for (int i = 0; i < compactIndex - offset - 1; i++) {
-      entries_.pop_front();
+    size_t compactOffset = compactIndex - beginIndex;
+
+    pb::Entry tmp;
+    tmp.set_term(entries_[compactOffset].term());
+    tmp.set_index(entries_[compactOffset].index());
+    entries_[0].Swap(&tmp);
+
+    size_t l = 1;
+    for (size_t i = compactOffset + 1; i < entries_.size(); i++) {
+      entries_[l++].Swap(&entries_[i]);
     }
+
+    entries_.resize(l);
     return Status::OK();
   }
 
@@ -103,10 +122,20 @@ class MemoryStorage : public Storage {
     LOG_ASSERT(i <= entries_.rbegin()->index());
   }
 
+ public:
+  // for test only
+  std::vector<pb::Entry> &TEST_Entries() {
+    return entries_;
+  }
+
  private:
   pb::HardState hard_state_;
   pb::Snapshot snapshot_;
-  std::deque<pb::Entry> entries_;
+
+  // Operations like Storage::Term, Storage::Entries require random access of the
+  // underlying data structure. In terms of performance, we choose
+  // std::vector to store entries.
+  std::vector<pb::Entry> entries_;
 
   mutable std::mutex mu_;
 };

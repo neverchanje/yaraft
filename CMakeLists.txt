@@ -15,6 +15,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 set(DEPS_LIB_DIR build/third_parties/lib)
 find_library(SILLY_LIBRARY silly_lite PATH ${DEPS_LIB_DIR})
 find_library(GLOG_LIBRARY glog PATH ${DEPS_LIB_DIR})
+find_library(PROTOBUF_LIBRARY protobuf PATH ${DEPS_LIB_DIR} NO_DEFAULT_PATH)
+find_library(PROTOC_LIBRARY protoc PATH ${DEPS_LIB_DIR})
 
 option(BUILD_TEST OFF)
 if(BUILD_TEST)
