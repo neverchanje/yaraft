@@ -1,6 +1,8 @@
 # yaraft
 
-yaraft is a migration of etcd/raft from golang to C++11.
+yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/raft) from golang to C++11.
+
+For now the whole implementation will be maintained in headers, before we nearly completing the work.
 
 ## License
 

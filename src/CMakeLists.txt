@@ -13,4 +13,10 @@ if(BUILD_TEST)
         )
     target_link_libraries(util_test
         gtest gtest_main ${PROTOBUF_LIBRARY})
+
+    add_executable(progress_test
+        progress_test.cc
+        )
+    target_link_libraries(progress_test
+        gtest gtest_main)
 endif()
