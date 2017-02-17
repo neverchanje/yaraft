@@ -15,8 +15,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 set(DEPS_LIB_DIR build/third_parties/lib)
 find_library(SILLY_LIBRARY silly_lite PATH ${DEPS_LIB_DIR})
 find_library(GLOG_LIBRARY glog PATH ${DEPS_LIB_DIR})
-find_library(PROTOBUF_LIBRARY protobuf PATH ${DEPS_LIB_DIR} NO_DEFAULT_PATH)
-find_library(PROTOC_LIBRARY protoc PATH ${DEPS_LIB_DIR})
+
+# protobuf
+find_library(PROTOBUF_LIBRARY protobuf PATH ${DEPS_LIB_DIR} NAME libprotobuf.a NO_DEFAULT_PATH)
+find_library(PROTOC_LIBRARY protoc PATH ${DEPS_LIB_DIR} NO_DEFAULT_PATH)
+message("Found ${PROTOBUF_LIBRARY}")
+message("Found ${PROTOC_LIBRARY}")
+
 
 option(BUILD_TEST OFF)
 if(BUILD_TEST)
@@ -30,6 +35,7 @@ include_directories(pb)
 include_directories(build/third_parties/include)
 
 add_subdirectory(src)
+add_subdirectory(bin)
 
 file(GLOB YARAFT_SOURCE "src/*.cc")
 

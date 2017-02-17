@@ -27,6 +27,7 @@ class Error {
     LogCompacted,
     SnapshotOutOfDate,
     Overflow,
+    InvalidConfig,
 
     // number of error codes
     ErrorCodesNum
@@ -47,6 +48,7 @@ class Error {
       ERROR_CODE_DESCRIPT(LogCompacted);
       ERROR_CODE_DESCRIPT(SnapshotOutOfDate);
       ERROR_CODE_DESCRIPT(Overflow);
+      ERROR_CODE_DESCRIPT(InvalidConfig);
       default:
         return "Unknown";
     }
