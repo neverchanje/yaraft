@@ -35,7 +35,6 @@ include_directories(pb)
 include_directories(build/third_parties/include)
 
 add_subdirectory(src)
-add_subdirectory(bin)
 
 file(GLOB YARAFT_SOURCE "src/*.cc")
 
