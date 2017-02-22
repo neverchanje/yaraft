@@ -22,11 +22,10 @@ find_library(PROTOC_LIBRARY protoc PATH ${DEPS_LIB_DIR} NO_DEFAULT_PATH)
 message("Found ${PROTOBUF_LIBRARY}")
 message("Found ${PROTOC_LIBRARY}")
 
-
 option(BUILD_TEST OFF)
 if(BUILD_TEST)
     enable_testing()
-    add_subdirectory(third_parties/googletest/googletest)
+    find_library(GTEST_LIBRARY)
 endif()
 
 include_directories(src)
@@ -36,8 +35,5 @@ include_directories(build/third_parties/include)
 
 add_subdirectory(src)
 
-file(GLOB YARAFT_SOURCE "src/*.cc")
-
-add_library(yaraft
-    ${YARAFT_SOURCE}
-    )
+file(GLOB YARAFT_HEADER "include/*.h")
+install(FILES ${YARAFT_HEADER} DESTINATION include/yaraft)
