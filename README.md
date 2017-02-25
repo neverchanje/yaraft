@@ -4,10 +4,15 @@ yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/
 
 ## Features
 
-[ ] Leader Election
-[ ] Log Replication
-[ ] Prevote
-[ ] CheckQuorum
+- [ ] Leader Election
+- [ ] Log Replication
+- [ ] Prevote
+- [ ] CheckQuorum
+- [ ] Log Compaction / InstallSnapshot
+- [ ] Flow Control
+- [ ] Restart
+- [ ] Single-Node Cluster
+- [ ] Read-only
 
 ## License
 
