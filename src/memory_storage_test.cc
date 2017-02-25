@@ -13,10 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
 #include <memory>
 
 #include "memory_storage.h"
+
+#include <gtest/gtest.h>
 
 using namespace yaraft;
 
@@ -27,7 +28,7 @@ pb::Entry pbEntry(uint64_t index, uint64_t term) {
   return tmp;
 }
 
-using EntryVec = std::vector<pb::Entry>;
+using EntryVec = Storage::EntryVec;
 using MemStoreUptr = std::unique_ptr<MemoryStorage>;
 
 EntryVec& operator<<(EntryVec& v, const pb::Entry& e) {
@@ -87,9 +88,8 @@ inline std::ostream& operator<<(std::ostream& os, const EntryVec& v) {
 }
 
 TEST(MemoryStorage, Term) {
-  MemoryStorage storage;
   struct TestData {
-    int i;
+    uint64_t i;
 
     Error::ErrorCodes werr;
     uint64_t wterm;
@@ -97,7 +97,7 @@ TEST(MemoryStorage, Term) {
                {3, Error::LogCompacted, 0},
                {4, Error::OK, 4},
                {5, Error::OK, 5},
-               {6, Error::Overflow, 0}};
+               {6, Error::OutOfBound, 0}};
 
   for (auto t : tests) {
     MemStoreUptr storage(MemoryStorage::TEST_Empty());
@@ -112,7 +112,7 @@ TEST(MemoryStorage, Term) {
 
 TEST(MemoryStorage, Compact) {
   struct TestData {
-    int i;
+    uint64_t i;
 
     Error::ErrorCodes werr;
     uint64_t windex;
@@ -163,7 +163,9 @@ TEST(MemoryStorage, Entries) {
     storage->TEST_Entries() << ents;
     auto status = storage->Entries(t.lo, t.hi, t.maxSize);
     ASSERT_EQ(status.GetStatus().Code(), t.werr);
-    if (status.OK())
-      ASSERT_TRUE(status.GetValue() == t.went) << status.GetValue() << t.went;
+    if (status.OK()) {
+      Storage::EntryVec vec(status.GetValue().begin(), status.GetValue().end());
+      ASSERT_TRUE(vec == t.went) << vec << t.went;
+    }
   }
 }

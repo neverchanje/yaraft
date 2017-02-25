@@ -21,7 +21,10 @@
 #include "raftpb.pb.h"
 #include "status.h"
 
+#include <boost/range/iterator_range.hpp>
+
 namespace yaraft {
+
 
 // Storage is an interface that may be implemented by the application
 // to retrieve log entries from storage.
@@ -55,13 +58,15 @@ class Storage {
   // snapshot and call Snapshot later.
   virtual StatusWith<pb::Snapshot> Snapshot() const = 0;
 
+  typedef std::vector<pb::Entry> EntryVec;
+  typedef boost::iterator_range<EntryVec::iterator> EntryRange;
+
   // Entries returns a slice of log entries in the range [lo,hi).
   // MaxSize limits the total size of the log entries returned, but
   // Entries returns at least one entry if any.
-  // TODO: I don't think it's a good interface in C++. Data in the range will be copied out, rather
   // than reference counted.
-  virtual StatusWith<std::vector<pb::Entry>> Entries(uint64_t lo, uint64_t hi,
-                                                     uint64_t maxSize) = 0;
+  virtual StatusWith<EntryRange> Entries(uint64_t lo, uint64_t hi,
+                                         uint64_t maxSize) = 0;
 };
 
 }  // namespace yaraft

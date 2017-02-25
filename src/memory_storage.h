@@ -49,7 +49,7 @@ class MemoryStorage : public Storage {
     }
 
     if (i > entries_.rbegin()->index()) {
-      return Status::Make(Error::Overflow);
+      return Status::Make(Error::OutOfBound);
     }
 
     return StatusWith<uint64_t>(entries_[i - beginIndex].term());
@@ -65,15 +65,8 @@ class MemoryStorage : public Storage {
     return StatusWith<uint64_t>(entries_.rbegin()->index());
   }
 
-  virtual StatusWith<pb::Snapshot> Snapshot() const override {
-    std::lock_guard<std::mutex> guard(mu_);
-    return snapshot_;
-  }
-
-  virtual StatusWith<std::vector<pb::Entry>> Entries(uint64_t lo, uint64_t hi,
+  virtual StatusWith<EntryRange> Entries(uint64_t lo, uint64_t hi,
                                                      uint64_t maxSize) override {
-    using StatusWithEntryVec = StatusWith<std::vector<pb::Entry>>;
-
     DLOG_ASSERT(lo <= hi);
 
     std::lock_guard<std::mutex> guard(mu_);
@@ -85,24 +78,25 @@ class MemoryStorage : public Storage {
 
     if (entries_.size() == 1) {
       // contains only a dummy entry
-      return StatusWithEntryVec(Error::Overflow);
+      return Status::Make(Error::OutOfBound);
     }
 
-    std::vector<pb::Entry> ret;
-    ret.reserve(hi - lo);
     uint64_t loOffset = lo - entries_.begin()->index();
-
-    ret.push_back(entries_[loOffset]);
-    uint64_t size = entries_[loOffset].ByteSize();
+    int size = entries_[loOffset].ByteSize();
+    EntryVec::iterator begin = entries_.begin()+loOffset;
+    EntryVec::iterator end = begin+1;
 
     for (int i = 1; i < hi - lo; i++) {
-      size += entries_[i + loOffset].ByteSize();
+      size += end->ByteSize();
       if (size > maxSize)
         break;
-      ret.push_back(entries_[i + loOffset]);
+      end++;
     }
 
-    return StatusWithEntryVec(ret);
+    return StatusWith<EntryRange>(EntryRange(begin, end));
+  }
+
+  virtual StatusWith<pb::Snapshot> Snapshot() const {
   }
 
  public:
@@ -141,20 +135,6 @@ class MemoryStorage : public Storage {
   void SetHardState(pb::HardState st) {
     std::lock_guard<std::mutex> guard(mu_);
     hard_state_.Swap(&st);
-  }
-
-  // CreateSnapshot makes a snapshot which can be retrieved with Snapshot() and
-  // can be used to reconstruct the state at that point.
-  // If any configuration changes have been made since the last compaction,
-  // the result of the last ApplyConfChange must be passed in.
-  StatusWith<pb::Snapshot *> CreateSnapshot(uint64_t i, pb::ConfState *cs, char data[]) const {
-    std::lock_guard<std::mutex> guard(mu_);
-    if (i <= snapshot_.metadata().index()) {
-      return StatusWith<pb::Snapshot *>(Error::SnapshotOutOfDate);
-    }
-    if (cs) {
-    }
-    LOG_ASSERT(i <= entries_.rbegin()->index());
   }
 
  public:
