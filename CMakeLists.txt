@@ -24,8 +24,7 @@ message("Found ${PROTOC_LIBRARY}")
 
 option(BUILD_TEST OFF)
 if(BUILD_TEST)
-    enable_testing()
-    find_library(GTEST_LIBRARY)
+    add_subdirectory(third_parties/googletest/googletest)
 endif()
 
 include_directories(src)

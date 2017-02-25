@@ -9,13 +9,10 @@ BUILD_DIR=`pwd`/build
 
 echo "Installing googletest..."
 if [ ! -f "${FLAG_PREFIX}/googletest_1_8_0" ] \
-    || [ ! -d "${DEPS_DIR}/googletest-release-1.8.0" ]; then
+    || [ ! -d "${DEPS_DIR}/googletest" ]; then
     wget -O ${DEPS_DIR}/googletest.zip https://github.com/google/googletest/archive/release-1.8.0.zip
     unzip -q -o ${DEPS_DIR}/googletest.zip -d ${DEPS_DIR}
-    cd ${DEPS_DIR}/googletest-release-1.8.0
-    mkdir -p build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=${DEPS_PREFIX}
-    make -j4 && make install
+    mv ${DEPS_DIR}/googletest-release-1.8.0 ${DEPS_DIR}/googletest
     touch "${FLAG_PREFIX}/googletest_1_8_0"
 fi
 
