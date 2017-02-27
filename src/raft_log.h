@@ -20,13 +20,90 @@
 #include "storage.h"
 #include "unstable.h"
 
+#include <fmt/format.h>
+#include <glog/logging.h>
+
 namespace yaraft {
 
 class RaftLog {
- public:
-  bool IsUpToDate(uint64_t index, uint64_t term);
+  /// |<- firstIndex          lastIndex->|
+  /// |-- Storage---|----- Unstable -----|
+  /// |=============|====================|
 
-  uint64_t Committed() const;
+ public:
+  RaftLog(Storage *storage) : storage_(storage) {
+    auto s = storage_->FirstIndex();
+    if (!s.GetStatus().OK()) {
+      LOG(FATAL) << s.GetStatus();
+    }
+  }
+
+  // Raft determines which of two logs is more up-to-date
+  // by comparing the index and term of the last entries in the
+  // logs. If the logs have last entries with different terms, then
+  // the log with the later term is more up-to-date. If the logs
+  // end with the same term, then whichever log is longer is
+  // more up-to-date. (Raft paper 5.4.1)
+  bool IsUpToDate(uint64_t index, uint64_t term) {
+    return (term > LastTerm()) || (term == LastTerm() && index >= LastIndex());
+  }
+
+  uint64_t Committed() const {}
+
+  StatusWith<uint64_t> Term(uint64_t index) const {
+    // the valid term range is [index of dummy entry, last index]
+    auto dummyIndex = FirstIndex() - 1;
+    if (index > LastIndex() || index < dummyIndex) {
+      return Status::Make(Error::OutOfBound);
+    }
+
+    auto pTerm = unstable_.MaybeTerm(index);
+    if (!pTerm) {
+      return pTerm.get();
+    }
+
+    auto s = storage_->Term(index);
+    if (s.OK()) {
+      return s.GetValue();
+    }
+
+    auto errorCode = s.GetStatus().Code();
+    if (errorCode == Error::OutOfBound) {
+      return s.GetStatus();
+    }
+
+    // unacceptable error
+    LOG(FATAL) << s.GetStatus();
+    return 0;
+  }
+
+  uint64_t LastIndex() const {
+    if (!unstable_.Empty()) {
+      return unstable_.entries.rbegin()->index();
+    } else {
+      auto s = storage_->LastIndex();
+      if (!s.OK()) {
+        LOG(FATAL) << s.GetStatus();
+      }
+      return s.GetValue();
+    }
+  }
+
+  uint64_t LastTerm() const {
+    auto s = Term(LastIndex());
+    if (!s.OK()) {
+      LOG(FATAL) << s.GetStatus();
+    }
+    return s.GetValue();
+  }
+
+  uint64_t FirstIndex() const {
+    auto s = storage_->FirstIndex();
+    if (!s.OK()) {
+      LOG(FATAL) << s.GetStatus();
+    }
+    return s.GetValue();
+  }
 
  private:
   // storage contains all stable entries since the last snapshot.

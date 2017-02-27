@@ -1,21 +1,28 @@
-if(${BUILD_TEST})
+if (${BUILD_TEST})
     add_executable(memory_storage_test
-        memory_storage_test.cc
-        ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-        )
+            memory_storage_test.cc
+            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
+            )
     target_link_libraries(memory_storage_test
-        gtest gtest_main ${PROTOBUF_LIBRARY} ${GLOG_LIBRARY})
+            gtest gtest_main ${PROTOBUF_LIBRARY} ${GLOG_LIBRARY})
 
     add_executable(util_test
-        util_test.cc
-        ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-        )
+            util_test.cc
+            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
+            )
     target_link_libraries(util_test
-        gtest gtest_main ${PROTOBUF_LIBRARY})
+            gtest gtest_main ${PROTOBUF_LIBRARY})
 
     add_executable(progress_test
-        progress_test.cc
-        )
+            progress_test.cc
+            )
     target_link_libraries(progress_test
-        gtest gtest_main)
-endif()
+            gtest gtest_main)
+
+    add_executable(raft_test
+            raft_test.cc
+            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
+            )
+    target_link_libraries(raft_test
+            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
+endif ()

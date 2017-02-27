@@ -22,45 +22,62 @@
 
 namespace yaraft {
 
+class Storage;
 // Config contains the parameters to start a raft.
 class Config {
  public:
-  // ID is the identity of the local raft. ID cannot be 0.
-  uint64_t ID;
+  // id is the identity of the local raft. id cannot be 0.
+  uint64_t id;
 
-  // PreVote enables the Pre-Vote algorithm described in raft thesis section
+  // preVote enables the Pre-Vote algorithm described in raft thesis section
   // 9.6. This prevents disruption when a node that has been partitioned away
   // rejoins the cluster.
-  bool PreVote;
+  bool preVote;
 
-  // ElectionTick is the number of Node.Tick invocations that must pass between
+  // electionTick is the number of Node.Tick invocations that must pass between
   // elections. That is, if a follower does not receive any message from the
-  // leader of current term before ElectionTick has elapsed, it will become
-  // candidate and start an election. ElectionTick must be greater than
-  // HeartbeatTick. We suggest ElectionTick = 10 * HeartbeatTick to avoid
+  // leader of current term before electionTick has elapsed, it will become
+  // candidate and start an election. electionTick must be greater than
+  // HeartbeatTick. We suggest electionTick = 10 * HeartbeatTick to avoid
   // unnecessary leader switching.
-  int ElectionTick;
+  int electionTick;
   // HeartbeatTick is the number of Node.Tick invocations that must pass between
   // heartbeats. That is, a leader sends heartbeat messages to maintain its
   // leadership every HeartbeatTick ticks.
-  int HeartbeatTick;
+  int heartbeatTick;
 
-  Status Validate() const {
-    if (ID == 0) {
-      return Status::Make(Error::InvalidConfig, "ID should not be 0");
-    }
+  // Storage is the storage for raft. raft generates entries and states to be
+  // stored in storage. raft reads the persisted entries and states out of
+  // Storage when it needs. raft reads out the previous state and configuration
+  // out of storage when restarting.
+  Storage* storage;
 
-    return Status::OK();
-  }
-
-  static Config TEST_NewConfig();
-
- private:
   // peers contains the IDs of all nodes (including self) in the raft cluster. It
   // should only be set when starting a new raft cluster. Restarting raft from
   // previous configuration will panic if peers is set. peer is private and only
   // used for testing right now.
-  std::vector<uint64_t> peers_;
+  std::vector<uint64_t> peers;
+
+  Status Validate() const {
+    if (id == 0) {
+      return Status::Make(Error::InvalidConfig, "ID cannot be 0");
+    }
+
+    if (heartbeatTick <= 0) {
+      return Status::Make(Error::InvalidConfig, "heartbeat tick must be greater than 0");
+    }
+
+    if (electionTick < heartbeatTick) {
+      return Status::Make(Error::InvalidConfig,
+                          "election tick must be greater than heartbeat tick");
+    }
+
+    if (!storage) {
+      return Status::Make(Error::InvalidConfig, "storage cannot be null");
+    }
+
+    return Status::OK();
+  }
 };
 
 }  // namespace yaraft

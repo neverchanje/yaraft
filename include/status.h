@@ -24,10 +24,9 @@ class Error {
   enum ErrorCodes {
     OK,
 
-    LogCompacted,
-    SnapshotOutOfDate,
-    Overflow,
+    OutOfBound,
     InvalidConfig,
+    LogCompacted,
 
     // number of error codes
     ErrorCodesNum
@@ -45,11 +44,11 @@ class Error {
     ErrorCodes code = static_cast<ErrorCodes>(errorCode);
     switch (code) {
       ERROR_CODE_DESCRIPT(OK);
-      ERROR_CODE_DESCRIPT(LogCompacted);
-      ERROR_CODE_DESCRIPT(SnapshotOutOfDate);
-      ERROR_CODE_DESCRIPT(Overflow);
+      ERROR_CODE_DESCRIPT(OutOfBound);
       ERROR_CODE_DESCRIPT(InvalidConfig);
+      ERROR_CODE_DESCRIPT(LogCompacted);
       default:
+        assert(false);
         return "Unknown";
     }
 #undef ERROR_CODE_DESCRIPT

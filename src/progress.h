@@ -81,6 +81,22 @@ class Progress {
     return true;
   }
 
+  // MaybeUpdate returns false if the given index comes from an outdated message.
+  // Otherwise it updates the progress and returns true.
+  bool MaybeUpdate(uint64_t index) {
+    bool updated = false;
+
+    if (match_ < index) {
+      match_ = index;
+      updated = true;
+    }
+
+    if (next_ < index + 1) {
+      next_ = index + 1;
+    }
+    return updated;
+  }
+
   std::string ToString() const {
     static const char* stateTypeName[] = {"StateProbe", "StateReplicate", "StateSnapshot"};
     std::stringstream ss;

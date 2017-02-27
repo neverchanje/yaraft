@@ -11,16 +11,24 @@ set(CXX_FLAGS
         )
 set(CMAKE_CXX_FLAGS_DEBUG "-O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+message("CMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}")
 
 set(DEPS_LIB_DIR build/third_parties/lib)
+
 find_library(SILLY_LIBRARY silly_lite PATH ${DEPS_LIB_DIR})
+message("Found ${SILLY_LIBRARY}")
+
 find_library(GLOG_LIBRARY glog PATH ${DEPS_LIB_DIR})
+message("Found ${GLOG_LIBRARY}")
 
 # protobuf
 find_library(PROTOBUF_LIBRARY protobuf PATH ${DEPS_LIB_DIR} NAME libprotobuf.a NO_DEFAULT_PATH)
 find_library(PROTOC_LIBRARY protoc PATH ${DEPS_LIB_DIR} NO_DEFAULT_PATH)
 message("Found ${PROTOBUF_LIBRARY}")
 message("Found ${PROTOC_LIBRARY}")
+
+find_library(FMT_LIBRARY fmt PATH ${DEPS_LIB_DIR})
+message("Found ${FMT_LIBRARY}")
 
 option(BUILD_TEST OFF)
 if(BUILD_TEST)
@@ -36,3 +44,6 @@ add_subdirectory(src)
 
 file(GLOB YARAFT_HEADER "include/*.h")
 install(FILES ${YARAFT_HEADER} DESTINATION include/yaraft)
+
+file(GLOB YARAFT_SOURCE "*/*.h" "*/*.cc")
+add_executable(fuck_clion ${YARAFT_SOURCE})
