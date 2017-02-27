@@ -164,8 +164,55 @@ TEST(MemoryStorage, Entries) {
     auto status = storage->Entries(t.lo, t.hi, t.maxSize);
     ASSERT_EQ(status.GetStatus().Code(), t.werr);
     if (status.OK()) {
-      Storage::EntryVec vec(status.GetValue().begin(), status.GetValue().end());
-      ASSERT_TRUE(vec == t.went) << vec << t.went;
+      const EntryVec& vec = status.GetValue();
+      ASSERT_TRUE(vec == t.went);
     }
+  }
+}
+
+TEST(MemoryStorage, Append) {
+  struct TestData {
+    EntryVec entries;
+
+    Error::ErrorCodes werr;
+    EntryVec went;
+  } tests[] = {
+      {
+          {pbEntry(3, 3), pbEntry(4, 4), pbEntry(5, 5)},
+          Error::OK,
+          {pbEntry(3, 3), pbEntry(4, 4), pbEntry(5, 5)},
+      },
+      {
+          {pbEntry(3, 3), pbEntry(4, 6), pbEntry(5, 6)},
+          Error::OK,
+          {pbEntry(3, 3), pbEntry(4, 6), pbEntry(5, 6)},
+      },
+      {
+          {pbEntry(3, 3), pbEntry(4, 4), pbEntry(5, 5), pbEntry(6, 5)},
+          Error::OK,
+          {pbEntry(3, 3), pbEntry(4, 4), pbEntry(5, 5), pbEntry(6, 5)},
+      },
+      // truncate incoming entries, truncate the existing entries and append
+      {
+          {pbEntry(2, 3), pbEntry(4, 4), pbEntry(5, 5), pbEntry(6, 5)},
+          Error::OK,
+          {pbEntry(3, 3), pbEntry(4, 4), pbEntry(5, 5), pbEntry(6, 5)},
+      },
+      // truncate the existing entries and append
+      {
+          {pbEntry(4, 5)}, Error::OK, {pbEntry(3, 3), pbEntry(4, 5)},
+      },
+      // direct append
+      {
+          {pbEntry(6, 5)}, Error::OK, {pbEntry(3, 3), pbEntry(4, 4), pbEntry(5, 5), pbEntry(6, 5)},
+      },
+  };
+
+  for (auto t : tests) {
+    MemStoreUptr storage(MemoryStorage::TEST_Empty());
+    storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
+    storage->Append(t.entries);
+
+    ASSERT_TRUE(storage->TEST_Entries() == t.went);
   }
 }

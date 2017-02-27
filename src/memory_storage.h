@@ -29,6 +29,7 @@ namespace yaraft {
 
 // MemoryStorage implements the Storage interface backed by an
 // in-memory array.
+// NOTE: MemoryStorage will only be used in tests.
 //
 // Thread-safe.
 class MemoryStorage : public Storage {
@@ -57,16 +58,15 @@ class MemoryStorage : public Storage {
 
   virtual StatusWith<uint64_t> FirstIndex() const override {
     std::lock_guard<std::mutex> guard(mu_);
-    return StatusWith<uint64_t>(entries_.begin()->index() + 1);
+    return firstIndex();
   }
 
   virtual StatusWith<uint64_t> LastIndex() const override {
     std::lock_guard<std::mutex> guard(mu_);
-    return StatusWith<uint64_t>(entries_.rbegin()->index());
+    return lastIndex();
   }
 
-  virtual StatusWith<EntryRange> Entries(uint64_t lo, uint64_t hi,
-                                                     uint64_t maxSize) override {
+  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) override {
     DLOG_ASSERT(lo <= hi);
 
     std::lock_guard<std::mutex> guard(mu_);
@@ -83,20 +83,22 @@ class MemoryStorage : public Storage {
 
     uint64_t loOffset = lo - entries_.begin()->index();
     int size = entries_[loOffset].ByteSize();
-    EntryVec::iterator begin = entries_.begin()+loOffset;
-    EntryVec::iterator end = begin+1;
+
+    std::vector<pb::Entry> ret;
+    ret.push_back(entries_[loOffset]);
 
     for (int i = 1; i < hi - lo; i++) {
-      size += end->ByteSize();
+      size += entries_[i + loOffset].ByteSize();
       if (size > maxSize)
         break;
-      end++;
+      ret.push_back(entries_[i + loOffset]);
     }
 
-    return StatusWith<EntryRange>(EntryRange(begin, end));
+    return ret;
   }
 
-  virtual StatusWith<pb::Snapshot> Snapshot() const {
+  virtual StatusWith<pb::Snapshot> Snapshot() const override {
+    return pb::Snapshot();
   }
 
  public:
@@ -135,6 +137,56 @@ class MemoryStorage : public Storage {
   void SetHardState(pb::HardState st) {
     std::lock_guard<std::mutex> guard(mu_);
     hard_state_.Swap(&st);
+  }
+
+  // Append the new entries to storage.
+  void Append(pb::Entry &entry) {
+    std::lock_guard<std::mutex> guard(mu_);
+    unsafeAppend(entry);
+  }
+
+  void Append(std::vector<pb::Entry> &entries) {
+    std::lock_guard<std::mutex> guard(mu_);
+    if (entries.empty())
+      return;
+
+    for (auto &e : entries) {
+      unsafeAppend(e);
+    }
+
+    // corner case
+    uint64_t end = entries.rbegin()->index();
+    if (end < lastIndex() && end >= firstIndex()) {
+      // truncate the existing entries
+      entries_.resize(end - entries_.begin()->index() + 1);
+    }
+  }
+
+ private:
+  uint64_t firstIndex() const {
+    return entries_.begin()->index() + 1;
+  }
+
+  uint64_t lastIndex() const {
+    return entries_.rbegin()->index();
+  }
+
+  void unsafeAppend(pb::Entry &entry) {
+    auto first = firstIndex();
+    auto last = lastIndex();
+    auto index = entry.index();
+    if (index < first)
+      return;
+    if (index > last) {
+      // ensures the entries are continuous.
+      DLOG_ASSERT(index - last == 1);
+      entries_.push_back(std::move(entry));
+      return;
+    }
+
+    // replace the old record if overlapped.
+    auto offset = entry.index() - entries_.begin()->index();
+    entries_[offset] = std::move(entry);
   }
 
  public:

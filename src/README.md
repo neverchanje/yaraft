@@ -4,7 +4,7 @@
 |------|---------|--------|
 |Any|Any message with term < `currentTerm`|Ignore this message|
 |Any|Any message contains term T > `currentTerm`|Set `currentTerm` = T, then process this message as normal.|
-|Any|MsgVote|[Handle RequestVote](#Handle-RequestVote)|
+|Any|MsgVote|[Handle RequestVote](#handle-requestvote)|
 |Leader|MsgBeat|Broadcast heartbeat messges to all peers.|
 |Leader|Rejected MsgApp (MsgAppResp with rejection)|Decrease `nextIndex` and retry.|
 |Leader|Committed MsgApp (OK MsgAppResp)|Update `matchIndex` to MsgAppResp.Index `n` if `matchIndex` < `n`. Update `nextIndex` to `n+1` if `nextIndex` < `n+1`. If matchIndex were updated, |
