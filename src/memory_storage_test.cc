@@ -16,76 +16,11 @@
 #include <memory>
 
 #include "memory_storage.h"
+#include "test_utils.h"
 
 #include <gtest/gtest.h>
 
 using namespace yaraft;
-
-pb::Entry pbEntry(uint64_t index, uint64_t term) {
-  pb::Entry tmp;
-  tmp.set_term(term);
-  tmp.set_index(index);
-  return tmp;
-}
-
-using EntryVec = Storage::EntryVec;
-using MemStoreUptr = std::unique_ptr<MemoryStorage>;
-
-EntryVec& operator<<(EntryVec& v, const pb::Entry& e) {
-  v.push_back(e);
-  return v;
-}
-
-EntryVec& operator<<(EntryVec& v, const EntryVec& v2) {
-  for (const auto& e : v2)
-    v << e;
-  return v;
-}
-
-EntryVec operator+(EntryVec v, pb::Entry e) {
-  v.push_back(e);
-  return v;
-}
-
-EntryVec operator+(pb::Entry e1, pb::Entry e2) {
-  EntryVec v;
-  v.push_back(e1);
-  v.push_back(e2);
-  return v;
-}
-
-inline bool operator==(pb::Entry e1, pb::Entry e2) {
-  bool result = (e1.term() == e2.term()) && (e1.index() == e2.index());
-  return result;
-}
-
-inline bool operator!=(pb::Entry e1, pb::Entry e2) {
-  return !(e1 == e2);
-}
-
-inline bool operator==(EntryVec v1, EntryVec v2) {
-  if (v1.size() != v2.size())
-    return false;
-  auto it1 = v1.begin();
-  auto it2 = v2.begin();
-  while (it1 != v1.end()) {
-    if (*it1++ != *it2++)
-      return false;
-  }
-  return true;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const pb::Entry& e) {
-  return os << "{Index: " << e.index() << ", Term: " << e.term() << "}";
-}
-
-inline std::ostream& operator<<(std::ostream& os, const EntryVec& v) {
-  os << "Size of entry vec: " << v.size() << ". | ";
-  for (const auto& e : v) {
-    os << e << " | ";
-  }
-  return os << "\n";
-}
 
 TEST(MemoryStorage, Term) {
   struct TestData {
@@ -211,7 +146,7 @@ TEST(MemoryStorage, Append) {
   for (auto t : tests) {
     MemStoreUptr storage(MemoryStorage::TEST_Empty());
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
-    storage->Append(t.entries);
+    storage->Append(std::move(t.entries));
 
     ASSERT_TRUE(storage->TEST_Entries() == t.went);
   }

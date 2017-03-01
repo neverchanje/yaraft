@@ -24,9 +24,9 @@ namespace yaraft {
 
 class Network {
  public:
-  Network(Config *cfg) {}
+  Network(Config* cfg) {}
 
-  void Send(const pb::Message &msg) {
+  void Send(const pb::Message& msg) {
     msg_.push_back(msg);
   }
 
@@ -34,8 +34,8 @@ class Network {
   std::vector<pb::Message> msg_;
 };
 
-Config *newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
-                      Storage *storage) {
+Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
+                      Storage* storage) {
   auto conf = new Config();
   conf->id = id;
   conf->electionTick = election;
@@ -45,9 +45,72 @@ Config *newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, in
   return conf;
 }
 
-Raft *newTestRaft(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
-                  Storage *storage) {
-  return new Raft(newTestConfig(id, peers, election, heartbeat, storage));
+Raft* newTestRaft(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
+                  Storage* storage) {
+  return Raft::Create(newTestConfig(id, peers, election, heartbeat, storage));
+}
+
+pb::Entry pbEntry(uint64_t index, uint64_t term) {
+  pb::Entry tmp;
+  tmp.set_term(term);
+  tmp.set_index(index);
+  return tmp;
+}
+
+EntryVec& operator<<(EntryVec& v, const pb::Entry& e) {
+  v.push_back(e);
+  return v;
+}
+
+EntryVec& operator<<(EntryVec& v, const EntryVec& v2) {
+  for (const auto& e : v2)
+    v << e;
+  return v;
+}
+
+EntryVec operator+(EntryVec v, pb::Entry e) {
+  v.push_back(e);
+  return v;
+}
+
+EntryVec operator+(pb::Entry e1, pb::Entry e2) {
+  EntryVec v;
+  v.push_back(e1);
+  v.push_back(e2);
+  return v;
+}
+
+inline bool operator==(pb::Entry e1, pb::Entry e2) {
+  bool result = (e1.term() == e2.term()) && (e1.index() == e2.index());
+  return result;
+}
+
+inline bool operator!=(pb::Entry e1, pb::Entry e2) {
+  return !(e1 == e2);
+}
+
+inline bool operator==(EntryVec v1, EntryVec v2) {
+  if (v1.size() != v2.size())
+    return false;
+  auto it1 = v1.begin();
+  auto it2 = v2.begin();
+  while (it1 != v1.end()) {
+    if (*it1++ != *it2++)
+      return false;
+  }
+  return true;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const pb::Entry& e) {
+  return os << "{Index: " << e.index() << ", Term: " << e.term() << "}";
+}
+
+inline std::ostream& operator<<(std::ostream& os, const EntryVec& v) {
+  os << "Size of entry vec: " << v.size() << ". | ";
+  for (const auto& e : v) {
+    os << e << " | ";
+  }
+  return os << "\n";
 }
 
 }  // namespace yaraft

@@ -101,6 +101,11 @@ class MemoryStorage : public Storage {
     return pb::Snapshot();
   }
 
+  virtual Status InitialState(pb::HardState *hardState, pb::ConfState *confState) override {
+    *hardState = hardState_;
+    return Status::OK();
+  }
+
  public:
   MemoryStorage() {
     // When starting from scratch populate the list with a dummy entry at term zero.
@@ -136,16 +141,16 @@ class MemoryStorage : public Storage {
   // SetHardState saves the current HardState.
   void SetHardState(pb::HardState st) {
     std::lock_guard<std::mutex> guard(mu_);
-    hard_state_.Swap(&st);
+    hardState_.Swap(&st);
   }
 
   // Append the new entries to storage.
-  void Append(pb::Entry &entry) {
+  void Append(pb::Entry &&entry) {
     std::lock_guard<std::mutex> guard(mu_);
     unsafeAppend(entry);
   }
 
-  void Append(std::vector<pb::Entry> &entries) {
+  void Append(EntryVec &&entries) {
     std::lock_guard<std::mutex> guard(mu_);
     if (entries.empty())
       return;
@@ -203,7 +208,7 @@ class MemoryStorage : public Storage {
   }
 
  private:
-  pb::HardState hard_state_;
+  pb::HardState hardState_;
   pb::Snapshot snapshot_;
 
   // Operations like Storage::Term, Storage::Entries require random access of the
@@ -213,5 +218,7 @@ class MemoryStorage : public Storage {
 
   mutable std::mutex mu_;
 };
+
+using MemStoreUptr = std::unique_ptr<MemoryStorage>;
 
 }  // namespace yaraft

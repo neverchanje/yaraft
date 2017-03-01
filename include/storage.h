@@ -23,6 +23,8 @@
 
 namespace yaraft {
 
+typedef std::vector<pb::Entry> EntryVec;
+
 // Storage is an interface that may be implemented by the application
 // to retrieve log entries from storage.
 //
@@ -55,14 +57,15 @@ class Storage {
   // snapshot and call Snapshot later.
   virtual StatusWith<pb::Snapshot> Snapshot() const = 0;
 
-  typedef std::vector<pb::Entry> EntryVec;
-
   // Entries returns a slice of log entries in the range [lo,hi).
   // MaxSize limits the total size of the log entries returned, but
   // Entries returns at least one entry if any.
   // than reference counted.
   // TODO(or not): Lazily copy entries out from storage.
   virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) = 0;
+
+  // InitialState returns the saved HardState and ConfState information.
+  virtual Status InitialState(pb::HardState *hardState, pb::ConfState *confState) = 0;
 };
 
 }  // namespace yaraft

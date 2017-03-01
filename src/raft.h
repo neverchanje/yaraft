@@ -22,12 +22,14 @@
 #include <unordered_map>
 
 #include "conf.h"
+#include "exception.h"
 #include "progress.h"
 #include "raft_log.h"
 #include "state_machine.h"
 
 #include <fmt/format.h>
 #include <glog/logging.h>
+#include <gtest/gtest-spi.h>
 
 namespace yaraft {
 
@@ -41,10 +43,24 @@ class Raft : public StateMachine {
   };
 
  public:
-  Raft(Config* conf) : c_(conf) {
+  Raft(Config* conf) : c_(conf) {}
+
+  static Raft* Create(Config* conf) {
     LOG_ASSERT(conf->Validate());
-    id_ = conf->id;
-    step_ = std::bind(&Raft::stepImpl, this, std::placeholders::_1);
+
+    Raft* r = new Raft(conf);
+    r->id_ = conf->id;
+    r->step_ = std::bind(&Raft::stepImpl, r, std::placeholders::_1);
+
+    pb::HardState hardState;
+    auto s = r->c_->storage->InitialState(&hardState, nullptr);
+    LOG_ASSERT(s.IsOK());
+    r->currentTerm_ = hardState.term();
+    r->votedFor_ = hardState.vote();
+
+    r->becomeFollower(r->currentTerm_, 0);
+
+    return r;
   }
 
   virtual Status Step(const pb::Message& m) override {
@@ -114,23 +130,31 @@ class Raft : public StateMachine {
 
     electionElapsed_ = 0;
     votedFor_ = 0;
+    resetRandomizedElectionTimeout();
 
     LOG(INFO) << id_ << " became follower at term " << currentTerm_;
   }
 
   void becomeCandidate() {
-    DLOG_ASSERT(role_ != kLeader) << "invalid transition [leader -> candidate]";
-    role_ = kCandidate;
+    if (role_ == kLeader)
+      throw RaftError("invalid transition [leader -> candidate]");
+
+    currentTerm_++;
     votedFor_ = id_;  // vote for itself
+    role_ = kCandidate;
+    electionElapsed_ = 0;
+    currentLeader_ = 0;
+    resetRandomizedElectionTimeout();
     LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
   }
 
   void becomeLeader() {
-    DLOG_ASSERT(role_ != kFollower) << "invalid transition [follower -> leader]";
-    DLOG_ASSERT(role_ != kLeader) << fmt::format("%x has already a leader", id_);
+    if (role_ == kFollower)
+      throw RaftError("invalid transition [follower -> leader]");
 
     role_ = kLeader;
     heartbeatElapsed_ = 0;
+    currentLeader_ = id_;
     LOG(INFO) << id_ << " became leader at term " << currentTerm_;
   }
 
@@ -351,15 +375,9 @@ class Raft : public StateMachine {
     randomizedElectionTimeout_ = rand(engine);
   }
 
- public:
-  // For unit tests to mock step_.
-  std::function<void(const pb::Message&)> step_;
-
-  void TEST_SetTerm(uint64_t term) {
-    currentTerm_ = term;
-  }
-
  private:
+  friend class RaftTest;
+
   uint64_t id_;
 
   // Number of ticks since it reached last electionTimeout when it is leader or candidate.
@@ -387,6 +405,9 @@ class Raft : public StateMachine {
 
   const std::unique_ptr<const Config> c_;
 
+  // For unit tests to mock step_.
+  std::function<void(const pb::Message&)> step_;
+
   // msgs to be sent are temporarily stored in MailBox.
   using MailBox = std::vector<pb::Message>;
   MailBox mails_;
@@ -395,5 +416,7 @@ class Raft : public StateMachine {
   using PeerMap = std::unordered_map<uint64_t, Progress>;
   PeerMap prs_;
 };
+
+using RaftUPtr = std::unique_ptr<Raft>;
 
 }  // namespace yaraft
