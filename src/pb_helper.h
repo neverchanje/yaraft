@@ -18,71 +18,87 @@
 
 namespace yaraft {
 
-template <typename T>
-struct Compose {};
+// This file provides utilities to construct protobuf structs in fluent style.
 
-template <>
-struct Compose<pb::Message> {
-  pb::Message value;
+struct PBMessage {
+  pb::Message v;
 
-  Compose& Term(uint64_t term) {
-    value.set_term(term);
+  PBMessage& Term(uint64_t term) {
+    v.set_term(term);
     return *this;
   }
 
-  Compose& LogTerm(uint64_t logTerm) {
-    value.set_logterm(logTerm);
+  PBMessage& LogTerm(uint64_t logTerm) {
+    v.set_logterm(logTerm);
     return *this;
   }
 
-  Compose& Type(pb::MessageType type) {
-    value.set_type(type);
+  PBMessage& Type(pb::MessageType type) {
+    v.set_type(type);
     return *this;
   }
 
-  Compose& To(uint64_t to) {
-    value.set_to(to);
+  PBMessage& To(uint64_t to) {
+    v.set_to(to);
     return *this;
   }
 
-  Compose& From(uint64_t from) {
-    value.set_from(from);
+  PBMessage& From(uint64_t from) {
+    v.set_from(from);
     return *this;
   }
 
-  Compose& Index(uint64_t index) {
-    value.set_index(index);
+  PBMessage& Index(uint64_t index) {
+    v.set_index(index);
     return *this;
   }
 
-  Compose& Commit(uint64_t commit) {
-    value.set_commit(commit);
-    return *this;
-  }
-};
-
-using PBMessage = Compose<pb::Message>;
-
-template <>
-struct Compose<pb::Entry> {
-  pb::Entry value;
-
-  Compose& Type(pb::EntryType type) {
-    value.set_type(type);
-    return *this;
-  }
-
-  Compose& Index(uint64_t index) {
-    value.set_index(index);
-    return *this;
-  }
-
-  Compose& Term(uint64_t term) {
-    value.set_term(term);
+  PBMessage& Commit(uint64_t commit) {
+    v.set_commit(commit);
     return *this;
   }
 };
 
-using PBEntry = Compose<pb::Entry>;
+struct PBEntry {
+  pb::Entry v;
+
+  PBEntry& Type(pb::EntryType type) {
+    v.set_type(type);
+    return *this;
+  }
+
+  PBEntry& Index(uint64_t index) {
+    v.set_index(index);
+    return *this;
+  }
+
+  PBEntry& Term(uint64_t term) {
+    v.set_term(term);
+    return *this;
+  }
+};
+
+struct PBSnapshot {
+  pb::Snapshot v;
+
+  PBSnapshot& Metadata(pb::SnapshotMetadata data) {
+    v.set_allocated_metadata(&data);
+    return *this;
+  }
+};
+
+struct PBSnapshotMetadata {
+  pb::SnapshotMetadata v;
+
+  PBSnapshotMetadata& Index(uint64_t index) {
+    v.set_index(index);
+    return *this;
+  }
+
+  PBSnapshotMetadata& Term(uint64_t term) {
+    v.set_term(term);
+    return *this;
+  }
+};
 
 }  // namespace yaraft

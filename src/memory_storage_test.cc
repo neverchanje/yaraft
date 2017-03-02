@@ -29,7 +29,7 @@ TEST(MemoryStorage, Term) {
     Error::ErrorCodes werr;
     uint64_t wterm;
   } tests[] = {{2, Error::LogCompacted, 0},
-               {3, Error::LogCompacted, 0},
+               {3, Error::OK, 3},
                {4, Error::OK, 4},
                {5, Error::OK, 5},
                {6, Error::OutOfBound, 0}};
@@ -146,7 +146,7 @@ TEST(MemoryStorage, Append) {
   for (auto t : tests) {
     MemStoreUptr storage(MemoryStorage::TEST_Empty());
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
-    storage->Append(std::move(t.entries));
+    storage->Append(t.entries);
 
     ASSERT_TRUE(storage->TEST_Entries() == t.went);
   }

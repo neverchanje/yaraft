@@ -18,6 +18,7 @@
 #include <mutex>
 #include <vector>
 
+#include "pb_helper.h"
 #include "raftpb.pb.h"
 #include "status.h"
 #include "storage.h"
@@ -36,16 +37,12 @@ class MemoryStorage : public Storage {
   __DISALLOW_COPYING__(MemoryStorage);
 
  public:
-  // NOTE: Except for MemoryStorage::Term, all operations on MemoryStorage is not allowed to place
-  // an index beyond LastIndex(), it'll panic when this happens. But index is allowed to be pointed
-  // before FirstIndex(), it'll return error status though, but it's deterministic.
-  // The point is: we can request to read stale data, but we cannot read data that does not exist.
   virtual StatusWith<uint64_t> Term(uint64_t i) const override {
     std::lock_guard<std::mutex> guard(mu_);
 
     auto beginIndex = entries_.begin()->index();
 
-    if (i <= beginIndex) {
+    if (i < beginIndex) {
       return Status::Make(Error::LogCompacted);
     }
 
@@ -98,7 +95,8 @@ class MemoryStorage : public Storage {
   }
 
   virtual StatusWith<pb::Snapshot> Snapshot() const override {
-    return pb::Snapshot();
+    std::lock_guard<std::mutex> guard(mu_);
+    return snapshot_;
   }
 
   virtual Status InitialState(pb::HardState *hardState, pb::ConfState *confState) override {
@@ -145,12 +143,12 @@ class MemoryStorage : public Storage {
   }
 
   // Append the new entries to storage.
-  void Append(pb::Entry &&entry) {
+  void Append(pb::Entry entry) {
     std::lock_guard<std::mutex> guard(mu_);
     unsafeAppend(entry);
   }
 
-  void Append(EntryVec &&entries) {
+  void Append(EntryVec entries) {
     std::lock_guard<std::mutex> guard(mu_);
     if (entries.empty())
       return;
@@ -165,6 +163,16 @@ class MemoryStorage : public Storage {
       // truncate the existing entries
       entries_.resize(end - entries_.begin()->index() + 1);
     }
+  }
+
+  // ApplySnapshot overwrites the contents of this Storage object with
+  // those of the given snapshot.
+  void ApplySnapshot(pb::Snapshot snap) {
+    std::lock_guard<std::mutex> guard(mu_);
+    snapshot_.Swap(&snap);
+    entries_.clear();
+    entries_.push_back(
+        PBEntry().Term(snapshot_.metadata().term()).Index(snapshot_.metadata().index()).v);
   }
 
  private:

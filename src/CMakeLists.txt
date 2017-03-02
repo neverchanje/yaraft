@@ -4,7 +4,7 @@ if (${BUILD_TEST})
             ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
             )
     target_link_libraries(memory_storage_test
-            gtest gtest_main ${PROTOBUF_LIBRARY} ${GLOG_LIBRARY})
+            gtest gtest_main ${PROTOBUF_LIBRARY} ${GLOG_LIBRARY} ${FMT_LIBRARY})
 
     add_executable(util_test
             util_test.cc
@@ -18,6 +18,13 @@ if (${BUILD_TEST})
             )
     target_link_libraries(progress_test
             gtest gtest_main)
+
+    add_executable(raft_log_test
+            raft_log_test.cc
+            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
+            )
+    target_link_libraries(raft_log_test
+            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
 
     add_executable(raft_test
             raft_test.cc
