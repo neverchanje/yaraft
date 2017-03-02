@@ -167,7 +167,7 @@ class MemoryStorage : public Storage {
 
   // ApplySnapshot overwrites the contents of this Storage object with
   // those of the given snapshot.
-  void ApplySnapshot(pb::Snapshot snap) {
+  void ApplySnapshot(pb::Snapshot &snap) {
     std::lock_guard<std::mutex> guard(mu_);
     snapshot_.Swap(&snap);
     entries_.clear();

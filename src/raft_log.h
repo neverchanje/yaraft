@@ -31,7 +31,7 @@ class RaftLog {
   /// |=============|====================|
 
  public:
-  RaftLog(Storage *storage) : storage_(storage) {
+  explicit RaftLog(Storage* storage) : storage_(storage) {
     auto s = storage_->FirstIndex();
     if (!s.GetStatus().OK()) {
       LOG(FATAL) << s.GetStatus();
@@ -48,17 +48,19 @@ class RaftLog {
     return (term > LastTerm()) || (term == LastTerm() && index >= LastIndex());
   }
 
-  uint64_t Committed() const {}
+  uint64_t CommitIndex() const {
+    return commitIndex_;
+  }
 
   StatusWith<uint64_t> Term(uint64_t index) const {
-    // the valid term range is [index of dummy entry, last index]
+    // the valid index range is [index of dummy entry, last index]
     auto dummyIndex = FirstIndex() - 1;
     if (index > LastIndex() || index < dummyIndex) {
       return Status::Make(Error::OutOfBound);
     }
 
     auto pTerm = unstable_.MaybeTerm(index);
-    if (!pTerm) {
+    if (pTerm) {
       return pTerm.get();
     }
 
@@ -68,7 +70,7 @@ class RaftLog {
     }
 
     auto errorCode = s.GetStatus().Code();
-    if (errorCode == Error::OutOfBound) {
+    if (errorCode == Error::OutOfBound || errorCode == Error::LogCompacted) {
       return s.GetStatus();
     }
 
@@ -103,6 +105,22 @@ class RaftLog {
       LOG(FATAL) << s.GetStatus();
     }
     return s.GetValue();
+  }
+
+  bool HasEntry(uint64_t index, uint64_t term) {
+    auto s = Term(index);
+    if (s.OK()) {
+      return s.GetValue() == term;
+    }
+    return false;
+  }
+
+  void Append(pb::Entry&& e) {}
+
+  // An entry is considered to be conflicting if it has the same index but
+  // a different term.
+  bool IsConflict(const pb::Entry& e) const {
+    auto index = e.index();
   }
 
  private:

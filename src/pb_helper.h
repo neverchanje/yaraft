@@ -81,22 +81,13 @@ struct PBEntry {
 struct PBSnapshot {
   pb::Snapshot v;
 
-  PBSnapshot& Metadata(pb::SnapshotMetadata data) {
-    v.set_allocated_metadata(&data);
-    return *this;
-  }
-};
-
-struct PBSnapshotMetadata {
-  pb::SnapshotMetadata v;
-
-  PBSnapshotMetadata& Index(uint64_t index) {
-    v.set_index(index);
+  PBSnapshot& MetaIndex(uint64_t index) {
+    v.mutable_metadata()->set_index(index);
     return *this;
   }
 
-  PBSnapshotMetadata& Term(uint64_t term) {
-    v.set_term(term);
+  PBSnapshot& MetaTerm(uint64_t term) {
+    v.mutable_metadata()->set_term(term);
     return *this;
   }
 };
