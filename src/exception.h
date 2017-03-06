@@ -1,4 +1,3 @@
-// Copyright 2017 The etcd Authors
 // Copyright 2017 Wu Tao
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,12 +16,27 @@
 
 #include <stdexcept>
 
+#include <fmt/format.h>
+
 namespace yaraft {
 
-class RaftError : public std::runtime_error {
+class RaftError : public std::exception {
  public:
-  RaftError(const std::string &what) : runtime_error(what) {}
+  explicit RaftError(const std::string& what) : msg_(what) {}
+
+  template <class... Args>
+  RaftError(const fmt::CStringRef fmtString, Args... args) {
+    msg_ = fmt::format(fmtString, std::forward<Args>(args)...);
+  }
+
   virtual ~RaftError() = default;
+
+  virtual const char* what() const noexcept {
+    return msg_.c_str();
+  }
+
+ protected:
+  std::string msg_;
 };
 
 }  // namespace yaraft

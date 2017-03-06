@@ -32,4 +32,11 @@ if (${BUILD_TEST})
             )
     target_link_libraries(raft_test
             gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
+
+    add_executable(unstable_test
+            unstable_test.cc
+            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
+            )
+    target_link_libraries(unstable_test
+            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
 endif ()

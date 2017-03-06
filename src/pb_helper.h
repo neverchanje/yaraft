@@ -15,6 +15,7 @@
 #pragma once
 
 #include "raftpb.pb.h"
+#include "storage.h"
 
 namespace yaraft {
 
@@ -57,7 +58,21 @@ struct PBMessage {
     v.set_commit(commit);
     return *this;
   }
+
+  PBMessage& Reject() {
+    v.set_reject(true);
+    return *this;
+  }
+
+  PBMessage& Entries(EntryVec list) {
+    for (auto& e : list) {
+      v.add_entries()->Swap(&e);
+    }
+    return *this;
+  }
 };
+
+using EntriesIterator = ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry>::iterator;
 
 struct PBEntry {
   pb::Entry v;

@@ -17,7 +17,7 @@
 
 #include <vector>
 
-#include "raftpb.pb.h"
+#include "pb_helper.h"
 
 #include <boost/optional.hpp>
 #include <glog/logging.h>
@@ -49,6 +49,18 @@ struct Unstable {
   }
 
   void StableTo(uint64_t i, uint64_t t) {}
+
+  void TruncateAndAppend(EntriesIterator begin, EntriesIterator end) {
+    DLOG_ASSERT(begin != end);
+    if (!entries.empty() && begin->index() <= LastIndex()) {
+      // truncate old entries
+      int64_t newSize = begin->index() - FirstIndex();
+      if (newSize < 0)
+        newSize = 0;
+      entries.resize(static_cast<size_t>(newSize));
+    }
+    std::for_each(begin, end, [&](pb::Entry& e) { entries.push_back(std::move(e)); });
+  }
 
   std::vector<pb::Entry> entries;
 };

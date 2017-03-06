@@ -21,7 +21,7 @@ namespace yaraft {
 
 class StateMachine {
  public:
-  virtual Status Step(const pb::Message& m) = 0;
+  virtual Status Step(pb::Message& m) = 0;
 };
 
 }  // namespace yaraft

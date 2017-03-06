@@ -113,4 +113,9 @@ inline std::ostream& operator<<(std::ostream& os, const EntryVec& v) {
   return os << "\n";
 }
 
+uint64_t mustTerm(const RaftLog& log, uint64_t index) {
+  auto s = log.Term(index);
+  return s.OK() ? s.GetValue() : 0;
+}
+
 }  // namespace yaraft
