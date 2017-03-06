@@ -62,7 +62,7 @@ class Storage {
   // Entries returns at least one entry if any.
   // than reference counted.
   // TODO(or not): Lazily copy entries out from storage.
-  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) = 0;
+  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t *maxSize) = 0;
 
   // InitialState returns the saved HardState and ConfState information.
   virtual Status InitialState(pb::HardState *hardState, pb::ConfState *confState) = 0;

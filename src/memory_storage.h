@@ -63,7 +63,7 @@ class MemoryStorage : public Storage {
     return lastIndex();
   }
 
-  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) override {
+  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t *maxSize) override {
     DLOG_ASSERT(lo <= hi);
 
     std::lock_guard<std::mutex> guard(mu_);
@@ -85,12 +85,15 @@ class MemoryStorage : public Storage {
     ret.push_back(entries_[loOffset]);
 
     for (int i = 1; i < hi - lo; i++) {
-      size += entries_[i + loOffset].ByteSize();
-      if (size > maxSize)
+      auto &e = entries_[i + loOffset];
+      size += e.ByteSize();
+      if (size > *maxSize) {
+        size -= e.ByteSize();
         break;
-      ret.push_back(entries_[i + loOffset]);
+      }
+      ret.push_back(e);
     }
-
+    *maxSize -= size;
     return ret;
   }
 
@@ -207,12 +210,6 @@ class MemoryStorage : public Storage {
 
   std::vector<pb::Entry> &TEST_Entries() {
     return entries_;
-  }
-
-  static MemoryStorage *TEST_Empty() {
-    auto tmp = new MemoryStorage();
-    tmp->entries_.clear();
-    return tmp;
   }
 
  private:

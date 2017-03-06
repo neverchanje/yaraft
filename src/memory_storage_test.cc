@@ -35,7 +35,8 @@ TEST(MemoryStorage, Term) {
                {6, Error::OutOfBound, 0}};
 
   for (auto t : tests) {
-    MemStoreUptr storage(MemoryStorage::TEST_Empty());
+    MemStoreUptr storage(new MemoryStorage());
+    storage->TEST_Entries().clear();
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
     auto result = storage->Term(t.i);
     ASSERT_EQ(result.GetStatus().Code(), t.werr);
@@ -59,7 +60,8 @@ TEST(MemoryStorage, Compact) {
                {5, Error::OK, 5, 5, 1}};
 
   for (auto t : tests) {
-    MemStoreUptr storage(MemoryStorage::TEST_Empty());
+    MemStoreUptr storage(new MemoryStorage());
+    storage->TEST_Entries().clear();
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
     auto status = storage->Compact(t.i);
     ASSERT_EQ(status.Code(), t.werr);
@@ -94,14 +96,24 @@ TEST(MemoryStorage, Entries) {
        pbEntry(4, 4) + pbEntry(5, 5) + pbEntry(6, 6)},
   };
   for (auto t : tests) {
-    MemStoreUptr storage(MemoryStorage::TEST_Empty());
+    MemStoreUptr storage(new MemoryStorage());
+    storage->TEST_Entries().clear();
     storage->TEST_Entries() << ents;
-    auto status = storage->Entries(t.lo, t.hi, t.maxSize);
+    uint64_t originalMaxSize = t.maxSize;
+
+    auto status = storage->Entries(t.lo, t.hi, &t.maxSize);
     ASSERT_EQ(status.GetStatus().Code(), t.werr);
     if (status.OK()) {
       const EntryVec& vec = status.GetValue();
       ASSERT_TRUE(vec == t.went);
     }
+
+    uint64_t totSize = 0;
+    for (auto& e : t.went) {
+      totSize += e.ByteSize();
+    }
+
+    ASSERT_EQ(originalMaxSize - totSize, t.maxSize);
   }
 }
 
@@ -144,7 +156,7 @@ TEST(MemoryStorage, Append) {
   };
 
   for (auto t : tests) {
-    MemStoreUptr storage(MemoryStorage::TEST_Empty());
+    MemStoreUptr storage(new MemoryStorage());
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
     storage->Append(t.entries);
 
