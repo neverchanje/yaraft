@@ -17,25 +17,31 @@
 
 #include <memory>
 
+#include "exception.h"
 #include "storage.h"
 #include "unstable.h"
 
 #include <fmt/format.h>
 #include <glog/logging.h>
+#include <silly/disallow_copying.h>
 
 namespace yaraft {
 
 class RaftLog {
+  __DISALLOW_COPYING__(RaftLog);
+
   /// |<- firstIndex          lastIndex->|
   /// |-- Storage---|----- Unstable -----|
   /// |=============|====================|
 
  public:
-  explicit RaftLog(Storage* storage) : storage_(storage) {
+  explicit RaftLog(Storage* storage) : storage_(storage), lastApplied_(0) {
     auto s = storage_->FirstIndex();
     if (!s.GetStatus().OK()) {
       LOG(FATAL) << s.GetStatus();
     }
+    auto firstIndex = s.GetValue();
+    commitIndex_ = firstIndex - 1;
   }
 
   // Raft determines which of two logs is more up-to-date
@@ -115,12 +121,119 @@ class RaftLog {
     return false;
   }
 
-  void Append(pb::Entry&& e) {}
+  uint64_t Append(pb::Entry e) {
+    auto msg = PBMessage().Entries({e}).v;
+    return Append(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
+  }
 
-  // An entry is considered to be conflicting if it has the same index but
-  // a different term.
-  bool IsConflict(const pb::Entry& e) const {
-    auto index = e.index();
+  uint64_t Append(EntryVec vec) {
+    auto msg = PBMessage().Entries(vec).v;
+    return Append(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
+  }
+
+  // Appends entries into unstable.
+  // Returns last index of new entries.
+  uint64_t Append(EntriesIterator begin, EntriesIterator end) {
+    if (begin == end) {
+      return LastIndex();
+    }
+    if (begin->index() <= commitIndex_) {
+      throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(),
+                      commitIndex_);
+    }
+    unstable_.TruncateAndAppend(begin, end);
+    return LastIndex();
+  }
+
+  void IncreaseCommit(uint64_t to) {
+    DLOG_ASSERT(to > commitIndex_);
+    commitIndex_ = to;
+  }
+
+  // MaybeAppend returns false and set newLastIndex=0 if the entries cannot be appended. Otherwise,
+  // it returns true and set newLastIndex = last index of new entries.
+  bool MaybeAppend(pb::Message& m, uint64_t* newLastIndex) {
+    uint64_t prevLogIndex = m.index();
+    uint64_t prevLogTerm = m.term();
+
+    if (HasEntry(prevLogIndex, prevLogTerm)) {
+      if (m.entries_size() > 0) {
+        // An entry in raft log that doesn't exist in MsgApp is defined as conflicted.
+        // MaybeAppend deletes the conflicted entry and all that follows it from raft log,
+        // and append new entries from MsgApp.
+        auto begin = m.mutable_entries()->begin();
+        auto end = m.mutable_entries()->end();
+
+        for (auto& e : m.entries()) {
+          if (!HasEntry(e.index(), e.term())) {
+            break;
+          }
+          begin++;
+        }
+
+        if (begin != end) {
+          if (begin->index() < CommitIndex()) {
+            throw RaftError("entry {:d} conflict with committed entry [committed({:d})]",
+                            begin->index(), CommitIndex());
+          }
+          Append(begin, end);
+        }
+        *newLastIndex = prevLogIndex + m.entries_size();
+        return true;
+      }
+    }
+    *newLastIndex = 0;
+    return false;
+  }
+
+  // Returns a slice of log entries from lo through hi-1, inclusive.
+  // FirstIndex <= lo < hi <= LastIndex + 1
+  StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) {
+    LOG_ASSERT(lo < hi);
+
+    uint64_t fi = FirstIndex(), li = LastIndex();
+    if (lo < fi)
+      return Status::Make(Error::LogCompacted);
+    LOG_ASSERT(hi <= li + 1) << fmt::format(" slice[{:d},{:d}) out of bound [{:d},{:d}]", lo, hi,
+                                            fi, li);
+
+    uint64_t uOffset = UnstableOffset();
+
+    EntryVec ret;
+    if (lo < uOffset) {
+      auto s = storage_->Entries(lo, std::min(hi, uOffset), &maxSize);
+      if (!s.OK()) {
+        return s.GetStatus();
+      }
+      ret = std::move(s.GetValue());
+    }
+
+    if (hi > uOffset) {
+      auto begin = std::max(lo, uOffset) - uOffset + unstable_.entries.begin();
+      auto end = unstable_.entries.end();
+      uint64_t size = 0;
+
+      int64_t remains = hi - lo - ret.size();
+      auto it = begin;
+      for (; it != end && remains > 0; it++) {
+        size += it->ByteSize();
+        if (size > maxSize)
+          break;
+        remains--;
+      }
+      end = it;
+
+      std::copy(begin, end, std::back_inserter(ret));
+    }
+
+    return ret;
+  }
+
+  // Returns the left bound index of entries in unstable_.
+  uint64_t UnstableOffset() const {
+    auto s = storage_->LastIndex();
+    LOG_ASSERT(s.GetStatus().OK());
+    return unstable_.Empty() ? s.GetValue() + 1 : unstable_.FirstIndex();
   }
 
  private:

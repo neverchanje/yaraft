@@ -46,3 +46,83 @@ TEST(RaftLog, Term) {
     ASSERT_EQ(mustTerm(log, t.index), t.wterm) << t.index << " " << t.wterm;
   }
 }
+
+TEST(RaftLog, Append) {
+  struct TestData {
+    EntryVec ents;
+
+    uint64_t windex;
+    EntryVec wents;
+    uint64_t wunstable;
+  } tests[] = {
+      {{}, 2, pbEntry(1, 1) + pbEntry(2, 2)},
+      {{pbEntry(3, 2)}, 3, pbEntry(1, 1) + pbEntry(2, 2) + pbEntry(3, 2)},
+
+      // conflicts with index 1
+      {{pbEntry(1, 2)}, 1, {pbEntry(1, 2)}},
+
+      // conflicts with index 2
+      {pbEntry(2, 3) + pbEntry(3, 3), 3, pbEntry(1, 1) + pbEntry(2, 3) + pbEntry(3, 3)},
+  };
+
+  for (auto t : tests) {
+    auto storage = new MemoryStorage();
+    storage->Append(pbEntry(1, 1) + pbEntry(2, 2));
+
+    RaftLog log(storage);
+
+    uint64_t index = log.Append(t.ents);
+    ASSERT_EQ(index, t.windex);
+
+    EntryVec ents;
+    auto s = log.Entries(1, log.LastIndex() + 1, noLimit);
+    ASSERT_TRUE(s.OK());
+    ents = s.GetValue();
+    ASSERT_TRUE(ents == t.wents);
+  }
+}
+
+TEST(RaftLog, Entries) {
+  uint64_t offset = 100;
+  uint64_t num = 100;
+  uint64_t last = offset + num;
+  uint64_t half = offset + num / 2;
+  auto halfe = pbEntry(half, half);
+
+  auto storage = new MemoryStorage();
+  storage->ApplySnapshot(PBSnapshot().MetaIndex(offset).v);
+  for (uint64_t i = 1; i < num / 2; i++) {
+    storage->Append(pbEntry(offset + i, offset + i));
+  }
+
+  RaftLog log(storage);
+  for (uint64_t i = num / 2; i < num; i++) {
+    log.Append(pbEntry(offset + i, offset + i));
+  }
+
+  auto noLimit = std::numeric_limits<uint64_t>::max();
+
+  struct TestData {
+    uint64_t from, to, limit;
+
+    EntryVec w;
+  } tests[] = {
+      // test no limit
+      {offset - 1, offset + 1, noLimit, {}},
+      {offset, offset + 1, noLimit, {}},
+      {half - 1, half + 1, noLimit, {pbEntry(half - 1, half - 1), pbEntry(half, half)}},
+      {half, half + 1, noLimit, {pbEntry(half, half)}},
+      {last - 1, last, noLimit, {pbEntry(last - 1, last - 1)}},
+
+      // TODO test limit
+  };
+
+  for (auto t : tests) {
+    auto s = log.Entries(t.from, t.to, t.limit);
+    if (t.from <= offset) {
+      ASSERT_EQ(s.GetStatus().Code(), Error::LogCompacted);
+      continue;
+    }
+    ASSERT_TRUE(s.GetValue() == t.w);
+  }
+}

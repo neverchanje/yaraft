@@ -15,6 +15,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <glog/logging.h>
 #include <silly/status.h>
 
 namespace yaraft {
@@ -72,12 +73,12 @@ class StatusWith {
   StatusWith(Error::ErrorCodes code) : StatusWith(Status::Make(code, nullptr)) {}
 
   const T& GetValue() const {
-    assert(status_.IsOK());
+    LOG_ASSERT(status_.IsOK());
     return *value_;
   }
 
   T& GetValue() {
-    assert(status_.IsOK());
+    LOG_ASSERT(status_.IsOK());
     return *value_;
   }
 

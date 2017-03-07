@@ -118,4 +118,6 @@ uint64_t mustTerm(const RaftLog& log, uint64_t index) {
   return s.OK() ? s.GetValue() : 0;
 }
 
+static uint64_t noLimit = std::numeric_limits<uint64_t>::max();
+
 }  // namespace yaraft
