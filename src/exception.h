@@ -22,10 +22,8 @@ namespace yaraft {
 
 class RaftError : public std::exception {
  public:
-  explicit RaftError(const std::string& what) : msg_(what) {}
-
   template <class... Args>
-  RaftError(const fmt::CStringRef fmtString, Args... args) {
+  explicit RaftError(const fmt::CStringRef fmtString, Args... args) {
     msg_ = fmt::format(fmtString, std::forward<Args>(args)...);
   }
 

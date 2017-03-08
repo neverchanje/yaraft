@@ -154,7 +154,7 @@ class RaftLog {
   // it returns true and set newLastIndex = last index of new entries.
   bool MaybeAppend(pb::Message& m, uint64_t* newLastIndex) {
     uint64_t prevLogIndex = m.index();
-    uint64_t prevLogTerm = m.term();
+    uint64_t prevLogTerm = m.logterm();
 
     if (HasEntry(prevLogIndex, prevLogTerm)) {
       if (m.entries_size() > 0) {
@@ -164,6 +164,9 @@ class RaftLog {
         auto begin = m.mutable_entries()->begin();
         auto end = m.mutable_entries()->end();
 
+        // prevLog must be immediately before the new log.
+        LOG_ASSERT(begin->index() == prevLogIndex + 1);
+
         for (auto& e : m.entries()) {
           if (!HasEntry(e.index(), e.term())) {
             break;
@@ -171,6 +174,7 @@ class RaftLog {
           begin++;
         }
 
+        // *begin is the first entry conflicted with the log.
         if (begin != end) {
           if (begin->index() < CommitIndex()) {
             throw RaftError("entry {:d} conflict with committed entry [committed({:d})]",
@@ -178,9 +182,9 @@ class RaftLog {
           }
           Append(begin, end);
         }
-        *newLastIndex = prevLogIndex + m.entries_size();
-        return true;
       }
+      *newLastIndex = prevLogIndex + m.entries_size();
+      return true;
     }
     *newLastIndex = 0;
     return false;

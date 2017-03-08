@@ -17,8 +17,6 @@
 #include "memory_storage.h"
 #include "test_utils.h"
 
-#include <gtest/gtest.h>
-
 using namespace yaraft;
 
 TEST(RaftLog, IsUpToDate) {}
@@ -100,8 +98,6 @@ TEST(RaftLog, Entries) {
     log.Append(pbEntry(offset + i, offset + i));
   }
 
-  auto noLimit = std::numeric_limits<uint64_t>::max();
-
   struct TestData {
     uint64_t from, to, limit;
 
@@ -124,5 +120,74 @@ TEST(RaftLog, Entries) {
       continue;
     }
     ASSERT_TRUE(s.GetValue() == t.w);
+  }
+}
+
+// RaftLog.MaybeAppend ensures:
+// If the given (index, term) matches with the existing log:
+// 	1. If an existing entry conflicts with a new one (same index
+// 	but different terms), delete the existing entry and all that
+// 	follow it
+// 	2. Append any new entries not already in the log
+// If the given (index, term) does not match with the existing log:
+// 	return false
+TEST(RaftLog, MaybeAppend) {
+  uint64_t prevIndex = 3;
+  uint64_t prevTerm = 3;
+
+  struct TestData {
+    uint64_t logTerm;
+    uint64_t index;
+    EntryVec ents;
+
+    uint64_t wlasti;
+    bool wappend;
+    bool wpanic;
+  } tests[] = {
+      // not match: term is different
+      {prevTerm - 1, prevIndex, {pbEntry(prevIndex + 1, prevTerm + 1)}, 0, false, false},
+
+      // not match: index out of bound
+      {prevTerm, prevIndex + 1, {pbEntry(prevIndex + 2, prevTerm + 1)}, 0, false, false},
+
+      // match with the last existing entry
+      {prevTerm, prevIndex, {}, prevIndex, true, false},
+      {prevTerm, prevIndex, {pbEntry(prevIndex + 1, prevTerm + 1)}, prevIndex + 1, true, false},
+      {prevTerm - 1, prevIndex - 1, {pbEntry(prevIndex, prevTerm)}, prevIndex, true, false},
+      {prevTerm - 2, prevIndex - 2, {pbEntry(prevIndex - 1, prevTerm)}, prevIndex - 1, true, false},
+      {
+          prevTerm - 3, prevIndex - 3, {pbEntry(prevIndex - 2, prevTerm)}, 0, false, true,
+      },  // conflict with existing committed entry
+      {
+          prevTerm - 2,
+          prevIndex - 2,
+          {pbEntry(prevIndex - 1, prevTerm), pbEntry(prevIndex, prevTerm)},
+          prevIndex,
+          true,
+          false,
+      },
+  };
+
+  for (auto t : tests) {
+    RaftLog log(new MemoryStorage());
+    log.Append(pbEntry(1, 1) + pbEntry(2, 2) + pbEntry(3, 3));
+    log.IncreaseCommit(1);
+
+    bool panic = false;
+    try {
+      uint64_t newLastIndex = 0;
+      auto msg = PBMessage().Index(t.index).LogTerm(t.logTerm).Entries(t.ents).v;
+      bool append = log.MaybeAppend(msg, &newLastIndex);
+      ASSERT_EQ(t.wlasti, newLastIndex);
+      ASSERT_EQ(t.wappend, append);
+      if (append && !t.ents.empty()) {
+        auto s = log.Entries(log.LastIndex() - t.ents.size() + 1, log.LastIndex() + 1, noLimit);
+        ASSERT_TRUE(s.OK());
+        ASSERT_TRUE(s.GetValue() == t.ents);
+      }
+    } catch (RaftError &e) {
+      panic = true;
+    }
+    ASSERT_EQ(panic, t.wpanic);
   }
 }
