@@ -113,6 +113,10 @@ class MemoryStorage : public Storage {
     entries_.push_back(pb::Entry());
   }
 
+  explicit MemoryStorage(EntryVec vec) : MemoryStorage() {
+    Append(vec);
+  }
+
   // Compact discards all log entries prior to compactIndex.
   // It is the application's responsibility to not attempt to compact an index
   // greater than raftLog.applied.

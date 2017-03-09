@@ -212,6 +212,36 @@ class RaftTest {
       ASSERT_EQ(raft->log_->CommitIndex(), t.wCommit);
     }
   }
+
+  // TestHandleHeartbeatResp ensures that we re-send log entries when we get a heartbeat response.
+  static void TestHandleHeartbeatResp() {
+    auto raft = newTestRaft(1, {1, 2}, 10, 1,
+                            new MemoryStorage(pbEntry(1, 1) + pbEntry(2, 2) + pbEntry(3, 3)));
+    raft->becomeCandidate();
+    raft->becomeLeader();
+
+    ASSERT_EQ(raft->prs_[2].NextIndex(), 4);
+
+    // A heartbeat response from a node that is behind; re-send MsgApp
+    raft->Step(PBMessage().From(2).Type(pb::MsgHeartbeatResp).Term(1).v);
+    ASSERT_EQ(raft->mails_.size(), 1);
+    ASSERT_EQ(raft->mails_.begin()->type(), pb::MsgApp);
+
+    // A second heartbeat response generates another MsgApp re-send
+    raft->mails_.clear();
+    raft->Step(PBMessage().From(2).Type(pb::MsgHeartbeatResp).Term(1).v);
+    ASSERT_EQ(raft->mails_.size(), 1);
+    ASSERT_EQ(raft->mails_.begin()->type(), pb::MsgApp);
+
+    // Once we have an MsgAppResp that pushes MatchIndex forward, heartbeats no longer send MsgApp.
+    auto msg = *raft->mails_.begin();
+    raft->Step(
+        PBMessage().From(2).Type(pb::MsgAppResp).Index(msg.index() + msg.entries_size()).Term(1).v);
+    raft->mails_.clear();
+
+    raft->Step(PBMessage().From(2).Type(pb::MsgHeartbeatResp).Term(1).v);
+    ASSERT_EQ(raft->mails_.size(), 0);
+  }
 };
 
 }  // namespace yaraft
@@ -230,4 +260,8 @@ TEST(Raft, StateTransition) {
 
 TEST(Raft, HandleHeartbeat) {
   yaraft::RaftTest::TestHandleHeartbeat();
+}
+
+TEST(Raft, HandleHeartbeatResp) {
+  yaraft::RaftTest::TestHandleHeartbeatResp();
 }

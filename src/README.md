@@ -8,7 +8,7 @@
 |Leader|MsgBeat|Broadcast heartbeat messges to all peers.|
 |Leader|Rejected MsgApp (MsgAppResp with rejection)|Decrease `nextIndex` and retry.|
 |Leader|Committed MsgApp (OK MsgAppResp)|Update `matchIndex` to MsgAppResp.Index `n` if `matchIndex` < `n`. Update `nextIndex` to `n+1` if `nextIndex` < `n+1`. If matchIndex were updated, |
-|Leader|MsgHeartbeatResp|Handle AppendEntries|
+|Leader|MsgHeartbeatResp|Resend AppendEntries when the follower was detected falling behind.|
 |Follower|MsgHup|[Convert to Candidate](#convert-to-candidate-requestvote)|
 |Follower|MsgApp|[Handle AppendEntries](#handle-appendentries)|
 |Follower|MsgTimeoutNow||
@@ -56,6 +56,7 @@
 
 1. Assert(state == Candidate)
 2. Set `currentLeader` to itself.
+3. Reinitialize `nextIndex[]`, and `matchIndex[]`.
 
 ### Timer
 - heartbeat timer
@@ -99,11 +100,16 @@ delete the existing entry and all that follow it.
 - Append any new entries not already in the log.
 
 #### MsgAppResp
+
 |Arguments||
 |-------|---|
 |Reject|True if the AppendEntries failed.|
 |RejectHint|Returns index of the last log entry. Empty if the AppendEntries is accepted.|
-|Index|If rejected, returns prevLogIndex, otherwise returns index of highest log entry known to be replicated on server.|
+|Index|If rejected, returns prevLogIndex, otherwise returns index of the last entry.|
+
+@see `Progress::MaybeUpdate`
+
+- Update the matchIndex and nextIndex of the follower, when a successful MsgAppResp is returned.
 
 ### Single-Node Cluster
 

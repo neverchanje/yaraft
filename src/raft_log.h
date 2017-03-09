@@ -247,6 +247,10 @@ class RaftLog {
     return unstable_.Empty() ? s.GetValue() + 1 : unstable_.FirstIndex();
   }
 
+  uint64_t LastApplied() const {
+    return lastApplied_;
+  }
+
  private:
   // storage contains all stable entries since the last snapshot.
   std::unique_ptr<Storage> storage_;

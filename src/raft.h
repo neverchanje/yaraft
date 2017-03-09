@@ -61,6 +61,18 @@ class Raft : public StateMachine {
 
     r->becomeFollower(r->currentTerm_, 0);
 
+    LOG_ASSERT(!conf->peers.empty());
+    const auto& peers = conf->peers;
+
+    std::string nodeStr = std::to_string(*peers.begin());
+    std::for_each(std::next(peers.begin()), peers.end(),
+                  [&](uint64_t p) { nodeStr += ", " + std::to_string(p); });
+
+    LOG(INFO) << fmt::format(
+        "newRaft {:x} [peers: [{:s}], term: {:d}, commit: {:d}, applied: {:d}, lastindex: {:d}, "
+        "lastterm: {:d}]",
+        r->id_, nodeStr, r->currentTerm_, r->log_->CommitIndex(), r->log_->LastApplied(),
+        r->log_->LastIndex(), r->log_->LastTerm());
     return r;
   }
 
@@ -156,6 +168,14 @@ class Raft : public StateMachine {
     role_ = kLeader;
     heartbeatElapsed_ = 0;
     currentLeader_ = id_;
+    prs_.clear();
+    for (uint64_t id : c_->peers) {
+      auto& pr = prs_[id] = Progress().NextIndex(log_->LastIndex() + 1);
+      if (id == id_) {
+        pr.MatchIndex(log_->LastIndex());
+      }
+    }
+
     LOG(INFO) << id_ << " became leader at term " << currentTerm_;
   }
 
@@ -168,8 +188,8 @@ class Raft : public StateMachine {
         break;
     }
 
-    DLOG_ASSERT(prs_.find(m.to()) == prs_.end())
-        << fmt::format("%x no progress available for %x", id_, m.from());
+    DLOG_ASSERT(prs_.find(m.from()) != prs_.end())
+        << fmt::format("{:x} no progress available for {:x}", id_, m.from());
 
     auto& pr = prs_[m.to()];
 
@@ -192,7 +212,12 @@ class Raft : public StateMachine {
         }
         break;
       case pb::MsgHeartbeatResp:
+        if (pr.MatchIndex() < log_->LastIndex()) {
+          sendAppend(m.from());
+        }
         break;
+      default:
+        LOG_ASSERT(false);
     }
   }
 
@@ -311,19 +336,18 @@ class Raft : public StateMachine {
   void sendAppend(uint64_t to) {
     const auto& pr = prs_[to];
 
-    pb::Message m;
-    m.set_to(to);
+    PBMessage m;
+    m.To(to);
 
     uint64_t prevLogIndex = pr.NextIndex() - 1;
     auto s = log_->Term(prevLogIndex);
+
     if (s.OK()) {
       uint64_t prevLogTerm = s.GetValue();
-      m.set_type(pb::MsgApp);
-      m.set_index(prevLogIndex);
-      m.set_term(prevLogTerm);
+      m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm);
     } else {
     }
-    send(m);
+    send(m.v);
   }
 
   void sendHeartbeat(uint64_t to) {
