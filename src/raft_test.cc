@@ -44,7 +44,7 @@ class RaftTest {
   // HandleAppendEntries ensures:
   // 1. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm.
   // 2. If an existing entry conflicts with a new one (same index but different terms),
-  //    delete the existirng entry and all that follow it; append any new entries not already in the
+  //    delete the existing entry and all that follow it; append any new entries not already in the
   //    log.
   // 3. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
   static void TestHandleMsgApp() {
@@ -57,16 +57,79 @@ class RaftTest {
     } tests[] = {
         // Ensure 1
         // previous log mismatch
-        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(3).Index(2).Commit(3).value, 2, 0, true},
+        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(3).Index(2).Commit(3).v, 2, 0, true},
         // previous log non-exist
-        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(3).Index(3).Commit(3).value, 2, 0, true},
+        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(3).Index(3).Commit(3).v, 2, 0, true},
+
+        // Ensure 2
+        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(1).Index(1).Commit(1).v, 2, 1, false},
+        {PBMessage()
+             .Type(pb::MsgApp)
+             .Term(2)
+             .LogTerm(0)
+             .Index(0)
+             .Commit(1)
+             .Entries({pbEntry(1, 2)})
+             .v,
+         1, 1, false},
+        {PBMessage()
+             .Type(pb::MsgApp)
+             .Term(2)
+             .LogTerm(2)
+             .Index(2)
+             .Commit(3)
+             .Entries(pbEntry(3, 2) + pbEntry(4, 2))
+             .v,
+         4, 3, false},
+        {PBMessage()
+             .Type(pb::MsgApp)
+             .Term(2)
+             .LogTerm(2)
+             .Index(2)
+             .Commit(4)
+             .Entries({pbEntry(3, 2)})
+             .v,
+         3, 3, false},
+        {PBMessage()
+             .Type(pb::MsgApp)
+             .Term(2)
+             .LogTerm(1)
+             .Index(1)
+             .Commit(4)
+             .Entries({pbEntry(2, 2)})
+             .v,
+         2, 2, false},
+
+        // Ensure 3
+        // match entry 1, commit up to last new entry 1
+        {PBMessage().Type(pb::MsgApp).Term(1).LogTerm(1).Index(1).Commit(3).v, 2, 1, false},
+        // match entry 1, commit up to last new entry 2
+        {PBMessage()
+             .Type(pb::MsgApp)
+             .Term(1)
+             .LogTerm(1)
+             .Index(1)
+             .Commit(3)
+             .Entries({pbEntry(2, 2)})
+             .v,
+         2, 2, false},
+        // match entry 2, commit up to last new entry 2
+        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(2).Index(2).Commit(3).v, 2, 2, false},
+        // commit up to log.last()
+        {PBMessage().Type(pb::MsgApp).Term(2).LogTerm(2).Index(2).Commit(4).v, 2, 2, false},
     };
 
     for (auto t : tests) {
-      //      auto storage = new MemoryStorage();
-      //      storage->Append(EntryVec({pbEntry(1, 1), pbEntry(2, 2)}));
-      //      RaftUPtr raft(newTestRaft(1, {1}, 10, 1, storage));
-      //      raft->handleAppendEntries(t.m);
+      auto storage = new MemoryStorage();
+      storage->Append(EntryVec({pbEntry(1, 1), pbEntry(2, 2)}));
+      RaftUPtr raft(newTestRaft(1, {1}, 10, 1, storage));
+      raft->becomeFollower(2, 0);
+
+      raft->handleAppendEntries(t.m);
+      ASSERT_EQ(raft->log_->LastIndex(), t.wIndex);
+      ASSERT_EQ(raft->log_->CommitIndex(), t.wCommit);
+      ASSERT_EQ(raft->mails_.size(), 1);
+      ASSERT_EQ(raft->mails_.begin()->reject(), t.wReject);
     }
   }
 

@@ -64,6 +64,11 @@ struct PBMessage {
     return *this;
   }
 
+  PBMessage& RejectHint(uint64_t hint) {
+    v.set_rejecthint(hint);
+    return *this;
+  }
+
   PBMessage& Entries(EntryVec list) {
     for (auto& e : list) {
       v.add_entries()->Swap(&e);

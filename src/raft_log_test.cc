@@ -171,7 +171,7 @@ TEST(RaftLog, MaybeAppend) {
   for (auto t : tests) {
     RaftLog log(new MemoryStorage());
     log.Append(pbEntry(1, 1) + pbEntry(2, 2) + pbEntry(3, 3));
-    log.IncreaseCommit(1);
+    log.CommitTo(1);
 
     bool panic = false;
     try {

@@ -62,6 +62,14 @@ struct Unstable {
     std::for_each(begin, end, [&](pb::Entry& e) { entries.push_back(std::move(e)); });
   }
 
+  EntryVec Entries(uint64_t lo, uint64_t hi, uint64_t* maxSize) {
+    EntryVec ret;
+    auto begin = std::max(lo, FirstIndex()) - FirstIndex() + entries.begin();
+    auto end = entries.end();
+    std::copy(begin, end, std::back_inserter(ret));
+    return ret;
+  }
+
   std::vector<pb::Entry> entries;
 };
 

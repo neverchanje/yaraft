@@ -13,6 +13,8 @@ yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/
 - [ ] Restart
 - [ ] Single-Node Cluster
 - [ ] Read-only
+- [ ] Leader Transfer
+- [ ] Leader Stickiness
 
 ## License
 

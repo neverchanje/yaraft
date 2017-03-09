@@ -10,7 +10,7 @@
 |Leader|Committed MsgApp (OK MsgAppResp)|Update `matchIndex` to MsgAppResp.Index `n` if `matchIndex` < `n`. Update `nextIndex` to `n+1` if `nextIndex` < `n+1`. If matchIndex were updated, |
 |Leader|MsgHeartbeatResp|Handle AppendEntries|
 |Follower|MsgHup|[Convert to Candidate](#convert-to-candidate-requestvote)|
-|Follower|MsgApp|Reset election timer. |
+|Follower|MsgApp|[Handle AppendEntries](#handle-appendentries)|
 |Follower|MsgTimeoutNow||
 
 |Server (Stable)|Description|Initial Value|
@@ -34,7 +34,7 @@
 
 |Progress|Description|Initial Value|
 |------|-----------|-------------|
-|nextIndex|The next entry to send to each follower.|\\|
+|nextIndex|The next entry to send to each follower. nextIndex is always larger than prevLogIndex.|\\|
 |matchIndex|The latest entry that each follower has acknowledged is the same as the leader's. This is used to calculate commitIndex on the leader.|\\|
 
 ### Convert to Follower
@@ -74,10 +74,36 @@ and either if we have voted for the same candidate, or we haven't voted for any 
 
 ### Handle AppendEntries
 
+@see `Raft::handleAppendEntries`
+
 - Assert(state == Follower)
-- Assert(m.Term == `currentTerm`)
-- Assert(The follower has an entry with the same index and term as prevLogIndex and prevLogTerm). 
-More specifically, `prevLogIndex <= LastIndex() && prevLogTerm = log[prevLogIndex].Term`.
+- Reply false if log doesn’t contain an entry at `prevLogIndex` whose term matches `prevLogTerm`. 
+- If `leaderCommit > commitIndex`, set `commitIndex = min(leaderCommit, index of last new entry)`.
+More specifically:
+```c
+newLastIndex = prevLogIndex + sizeof(entries);
+newCommitIndex = min(leaderCommit, newLastIndex);
+if(newCommitIndex > commitIndex) {
+    // commitIndex never decreases
+    if(newCommitIndex > lastIndex)
+        error_handling("")
+    commitIndex = newCommitIndex;
+}
+```
+Given a corner case: What if `commitIndex > prevLogIndex` ? 
+
+@see `RaftLog::MaybeAppend`
+
+- If an existing entry conflicts with a new one (same index but different terms), 
+delete the existing entry and all that follow it.
+- Append any new entries not already in the log.
+
+#### MsgAppResp
+|Arguments||
+|-------|---|
+|Reject|True if the AppendEntries failed.|
+|RejectHint|Returns index of the last log entry. Empty if the AppendEntries is accepted.|
+|Index|If rejected, returns prevLogIndex, otherwise returns index of highest log entry known to be replicated on server.|
 
 ### Single-Node Cluster
 

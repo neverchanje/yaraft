@@ -23,6 +23,7 @@
 
 #include "conf.h"
 #include "exception.h"
+#include "pb_helper.h"
 #include "progress.h"
 #include "raft_log.h"
 #include "state_machine.h"
@@ -43,7 +44,7 @@ class Raft : public StateMachine {
   };
 
  public:
-  Raft(Config* conf) : c_(conf) {}
+  explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {}
 
   static Raft* Create(Config* conf) {
     LOG_ASSERT(conf->Validate());
@@ -63,7 +64,7 @@ class Raft : public StateMachine {
     return r;
   }
 
-  virtual Status Step(const pb::Message& m) override {
+  virtual Status Step(pb::Message& m) override {
     if (currentTerm_ > m.term()) {
       // ignore the message
 
@@ -197,7 +198,7 @@ class Raft : public StateMachine {
 
   void stepCandidate(const pb::Message& m) {}
 
-  void stepFollower(const pb::Message& m) {
+  void stepFollower(pb::Message& m) {
     switch (m.type()) {
       case pb::MsgApp:
         electionElapsed_ = 0;
@@ -207,7 +208,7 @@ class Raft : public StateMachine {
     }
   }
 
-  void stepImpl(const pb::Message& m) {
+  void stepImpl(pb::Message& m) {
     switch (role_) {
       case kLeader:
         stepLeader(m);
@@ -336,7 +337,7 @@ class Raft : public StateMachine {
     pb::Message msgToBeSent;
     msgToBeSent.set_to(to);
     msgToBeSent.set_type(pb::MsgHeartbeat);
-    msgToBeSent.set_commit(std::min(prs_[to].MatchIndex(), log_->Committed()));
+    msgToBeSent.set_commit(std::min(prs_[to].MatchIndex(), log_->CommitIndex()));
     send(msgToBeSent);
   }
 
@@ -344,7 +345,28 @@ class Raft : public StateMachine {
 
   void handleMsgAppResp(const pb::Message& m) {}
 
-  void handleAppendEntries(const pb::Message& m) {}
+  void handleAppendEntries(pb::Message& m) {
+    DLOG_ASSERT(role_ == StateRole::kFollower);
+
+    uint64_t prevLogIndex = m.index();
+    uint64_t prevLogTerm = m.logterm();
+
+    PBMessage msg;
+    msg.To(m.from()).Type(pb::MsgAppResp);
+
+    uint64_t newLastIndex = 0;
+    if (log_->MaybeAppend(m, &newLastIndex)) {
+      // commitIndex = min(leaderCommit, index of last new entry)
+      log_->CommitTo(std::min(m.commit(), newLastIndex));
+      send(msg.Index(newLastIndex).v);
+    } else {
+      send(msg.Index(m.index()).Reject().RejectHint(log_->LastIndex()).v);
+    }
+  }
+
+  void advanceCommitIndex() {
+    DLOG_ASSERT(role_ == StateRole::kLeader);
+  }
 
   void handleHeartbeat(const pb::Message& m) {}
 
@@ -406,7 +428,7 @@ class Raft : public StateMachine {
   const std::unique_ptr<const Config> c_;
 
   // For unit tests to mock step_.
-  std::function<void(const pb::Message&)> step_;
+  std::function<void(pb::Message&)> step_;
 
   // msgs to be sent are temporarily stored in MailBox.
   using MailBox = std::vector<pb::Message>;

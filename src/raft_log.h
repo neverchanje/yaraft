@@ -145,13 +145,20 @@ class RaftLog {
     return LastIndex();
   }
 
-  void IncreaseCommit(uint64_t to) {
-    DLOG_ASSERT(to > commitIndex_);
-    commitIndex_ = to;
+  void CommitTo(uint64_t to) {
+    if (to > commitIndex_) {
+      if (LastIndex() < to) {
+        throw RaftError(
+            "tocommit({:d}) is out of range [LastIndex({:d})]. Was the raft log corrupted, "
+            "truncated, or lost?",
+            to, LastIndex());
+      }
+      commitIndex_ = to;
+    }
   }
 
   // MaybeAppend returns false and set newLastIndex=0 if the entries cannot be appended. Otherwise,
-  // it returns true and set newLastIndex = last index of new entries.
+  // it returns true and set newLastIndex = last index of new entries = prevLogIndex + len(entries).
   bool MaybeAppend(pb::Message& m, uint64_t* newLastIndex) {
     uint64_t prevLogIndex = m.index();
     uint64_t prevLogTerm = m.logterm();
