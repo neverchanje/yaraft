@@ -368,7 +368,12 @@ class Raft : public StateMachine {
     DLOG_ASSERT(role_ == StateRole::kLeader);
   }
 
-  void handleHeartbeat(const pb::Message& m) {}
+  void handleHeartbeat(const pb::Message& m) {
+    DLOG_ASSERT(role_ == StateRole::kFollower);
+
+    log_->CommitTo(m.commit());
+    send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).v);
+  }
 
   void campaign(CampaignType type) {
     DLOG_ASSERT(type == kCampaignElection);

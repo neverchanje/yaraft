@@ -185,6 +185,33 @@ class RaftTest {
       }
     }
   }
+
+  static void TestHandleHeartbeat() {
+    uint64_t commit = 2;
+
+    struct TestData {
+      pb::Message m;
+
+      uint64_t wCommit;
+    } tests[] = {
+        // do not decrease commit
+        {PBMessage().From(2).To(1).Type(pb::MsgHeartbeat).Term(2).Commit(commit - 1).v, commit},
+
+        {PBMessage().From(2).To(1).Type(pb::MsgHeartbeat).Term(2).Commit(commit + 1).v, commit + 1},
+    };
+
+    for (auto t : tests) {
+      auto storage = new MemoryStorage();
+      storage->Append({pbEntry(1, 1), pbEntry(2, 2), pbEntry(3, 3)});
+      RaftUPtr raft(newTestRaft(1, {1, 2}, 10, 1, storage));
+      raft->becomeFollower(2, 0);
+      raft->log_->CommitTo(commit);
+
+      raft->handleHeartbeat(t.m);
+
+      ASSERT_EQ(raft->log_->CommitIndex(), t.wCommit);
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -199,4 +226,8 @@ TEST(Raft, HandleAppendEntries) {
 
 TEST(Raft, StateTransition) {
   yaraft::RaftTest::TestStateTransition();
+}
+
+TEST(Raft, HandleHeartbeat) {
+  yaraft::RaftTest::TestHandleHeartbeat();
 }

@@ -8,6 +8,7 @@ set(CXX_FLAGS
         -Wall
         -Wold-style-cast #warn if C-style implicit-casting occurs
         -Wconversion
+        -g
         )
 set(CMAKE_CXX_FLAGS_DEBUG "-O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
@@ -30,7 +31,7 @@ message("Found ${PROTOC_LIBRARY}")
 find_library(FMT_LIBRARY fmt PATH ${DEPS_LIB_DIR})
 message("Found ${FMT_LIBRARY}")
 
-option(BUILD_TEST OFF)
+option(BUILD_TEST ON)
 if(BUILD_TEST)
     add_subdirectory(third_parties/googletest/googletest)
 endif()
@@ -46,4 +47,4 @@ file(GLOB YARAFT_HEADER "include/*.h")
 install(FILES ${YARAFT_HEADER} DESTINATION include/yaraft)
 
 file(GLOB YARAFT_SOURCE "*/*.h" "*/*.cc")
-add_executable(fuck_clion ${YARAFT_SOURCE})
+add_executable(fuck_clion ${YARAFT_SOURCE} src/unique_ptr.h)
