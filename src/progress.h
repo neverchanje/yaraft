@@ -27,6 +27,8 @@ namespace yaraft {
 
 class Progress {
  public:
+  Progress() = default;
+
   enum StateType { StateProbe, StateReplicate, StateSnapshot };
 
   // The index of the next log entry the leader will send to the follower.

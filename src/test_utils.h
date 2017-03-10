@@ -15,24 +15,14 @@
 
 #pragma once
 
+#include <list>
+
 #include "conf.h"
 #include "raft.h"
 #include "raftpb.pb.h"
 #include "storage.h"
 
 namespace yaraft {
-
-class Network {
- public:
-  Network(Config* cfg) {}
-
-  void Send(const pb::Message& msg) {
-    msg_.push_back(msg);
-  }
-
- private:
-  std::vector<pb::Message> msg_;
-};
 
 Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
                       Storage* storage) {
@@ -47,8 +37,86 @@ Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, in
 
 Raft* newTestRaft(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
                   Storage* storage) {
-  return Raft::Create(newTestConfig(id, peers, election, heartbeat, storage));
+  return new Raft(newTestConfig(id, peers, election, heartbeat, storage));
 }
+
+struct Network {
+  explicit Network(std::vector<Raft*> prs) {
+    for (auto r : prs) {
+      peers_[r->Id()] = r;
+    }
+  }
+
+  void Send(pb::Message& m) {
+    uint64_t to = m.to();
+    peers_[to]->Step(m);
+
+    auto& responses = peers_[to]->mails_;
+    for (auto& resp : responses) {
+      mailTo_[resp.to()].emplace_back(std::move(resp));
+    }
+    DLOG_ASSERT(!responses.empty());
+  }
+
+  // take responses from mailbox
+  boost::optional<pb::Message> Take(uint64_t from, uint64_t to) {
+    if (mailTo_.empty())
+      return boost::none;
+
+    if (mailTo_.find(to) != mailTo_.end()) {
+      auto& msgs = mailTo_[to];
+      auto it = std::find_if(msgs.begin(), msgs.end(),
+                             [&](const pb::Message& m) { return m.from() == from; });
+      if (it != msgs.end()) {
+        pb::Message m = *it;
+        msgs.erase(it);
+        return boost::make_optional(m);
+      }
+    }
+    return boost::none;
+  }
+
+  pb::Message MustTake(uint64_t from, uint64_t to, pb::MessageType type) {
+    auto m = Take(from, to);
+    DLOG_ASSERT(bool(m));
+    DLOG_ASSERT(m->type() == type);
+    return *m;
+  }
+
+  static Network* New(uint64_t size) {
+    std::vector<uint64_t> ids(size);
+
+    uint64_t i = 1;
+    std::generate(ids.begin(), ids.end(), [&]() { return i++; });
+
+    i = 1;
+    std::vector<Raft*> peers(size);
+
+    std::generate(peers.begin(), peers.end(),
+                  [&]() { return newTestRaft(i++, ids, 10, 1, new MemoryStorage()); });
+
+    return new Network(peers);
+  }
+
+  Raft* Peer(uint64_t id) {
+    DLOG_ASSERT(peers_.find(id) != peers_.end());
+    return peers_[id];
+  }
+
+  Network* Set(Config* conf) {
+    if (peers_.find(conf->id) != peers_.end()) {
+      delete peers_[conf->id];
+    }
+    peers_[conf->id] = new Raft(conf);
+    return this;
+  }
+
+ private:
+  std::unordered_map<uint64_t, Raft*> peers_;
+
+  // to => Message
+  std::unordered_map<uint64_t, std::list<pb::Message>> mailTo_;
+};
 
 pb::Entry pbEntry(uint64_t index, uint64_t term) {
   pb::Entry tmp;

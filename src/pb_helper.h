@@ -64,6 +64,11 @@ struct PBMessage {
     return *this;
   }
 
+  PBMessage& Reject(bool reject) {
+    v.set_reject(reject);
+    return *this;
+  }
+
   PBMessage& RejectHint(uint64_t hint) {
     v.set_rejecthint(hint);
     return *this;

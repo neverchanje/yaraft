@@ -44,25 +44,25 @@ class Raft : public StateMachine {
   };
 
  public:
-  explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {}
-
-  static Raft* Create(Config* conf) {
+  explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {
     LOG_ASSERT(conf->Validate());
 
-    Raft* r = new Raft(conf);
-    r->id_ = conf->id;
-    r->step_ = std::bind(&Raft::stepImpl, r, std::placeholders::_1);
+    id_ = conf->id;
+    step_ = std::bind(&Raft::stepImpl, this, std::placeholders::_1);
 
     pb::HardState hardState;
-    auto s = r->c_->storage->InitialState(&hardState, nullptr);
+    auto s = c_->storage->InitialState(&hardState, nullptr);
     LOG_ASSERT(s.IsOK());
-    r->currentTerm_ = hardState.term();
-    r->votedFor_ = hardState.vote();
+    currentTerm_ = hardState.term();
+    votedFor_ = hardState.vote();
 
-    r->becomeFollower(r->currentTerm_, 0);
+    becomeFollower(currentTerm_, 0);
 
     LOG_ASSERT(!conf->peers.empty());
     const auto& peers = conf->peers;
+    for (uint64_t p : peers) {
+      prs_[p] = Progress();
+    }
 
     std::string nodeStr = std::to_string(*peers.begin());
     std::for_each(std::next(peers.begin()), peers.end(),
@@ -71,9 +71,24 @@ class Raft : public StateMachine {
     LOG(INFO) << fmt::format(
         "newRaft {:x} [peers: [{:s}], term: {:d}, commit: {:d}, applied: {:d}, lastindex: {:d}, "
         "lastterm: {:d}]",
-        r->id_, nodeStr, r->currentTerm_, r->log_->CommitIndex(), r->log_->LastApplied(),
-        r->log_->LastIndex(), r->log_->LastTerm());
-    return r;
+        id_, nodeStr, currentTerm_, log_->CommitIndex(), log_->LastApplied(), log_->LastIndex(),
+        log_->LastTerm());
+  }
+
+  void handleMsgVote(const pb::Message& m) {
+    if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
+      // - If we haven't voted for any candidates, or
+      // - if we have voted for the same peer (repeated votes for a same candidate is allowed),
+      // - and for all conditions above, the candidate's log must be at least as up-to-date as
+      // the voter's (raft thesis 3.6).
+
+      // then we can grant the vote.
+      sendVoteResp(m, false);
+      electionElapsed_ = 0;
+      votedFor_ = m.from();
+    } else {
+      sendVoteResp(m, true);
+    }
   }
 
   virtual Status Step(pb::Message& m) override {
@@ -82,7 +97,7 @@ class Raft : public StateMachine {
 
       LOG(INFO) << fmt::format(
           "{:x} [term: {:d}] ignored a {:s} message with lower term from {:x} [term: {:d}]", id_,
-          currentTerm_, m.GetTypeName(), m.from(), m.term());
+          currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
       return Status::OK();
     }
 
@@ -95,8 +110,8 @@ class Raft : public StateMachine {
       // Any messages (even a vote, except for prevote) will cause current node to step down as
       // follower.
       LOG(INFO) << fmt::format(
-          "%x [term: %d] received a %s message with higher term from %x [term: %d]", id_,
-          currentTerm_, m.GetTypeName(), m.from(), m.term());
+          "{:x} [term: {:d}] received a {:s} message with higher term from {:x} [term: {:d}]", id_,
+          currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
 
       becomeFollower(m.term(), lead);
     }
@@ -105,25 +120,13 @@ class Raft : public StateMachine {
 
     switch (m.type()) {
       case pb::MsgHup:
-        LOG_ASSERT(role_ == kFollower);
+        LOG_ASSERT(role_ == kFollower ||
+                   role_ == kCandidate);  // candidates may re-elect itself continuously.
         LOG(INFO) << id_ << " is starting a new election at term " << currentTerm_;
         campaign(kCampaignElection);
         break;
       case pb::MsgVote:
-        if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
-          // - If we haven't voted for any candidates, or
-          // - if we have voted for the same peer (repeated votes for a same candidate is allowed),
-          // - and for all conditions above, the candidate's log must be at least as up-to-date as
-          // the voter's (raft thesis 3.6).
-
-          // then we can grant the vote.
-          sendVoteResp(m, false);
-          electionElapsed_ = 0;
-          votedFor_ = m.from();
-        } else {
-          sendVoteResp(m, true);
-        }
-
+        handleMsgVote(m);
         break;
       default:
         step_(m);
@@ -133,6 +136,10 @@ class Raft : public StateMachine {
 
   uint64_t Term() const {
     return currentTerm_;
+  }
+
+  uint64_t Id() const {
+    return id_;
   }
 
  private:
@@ -152,13 +159,19 @@ class Raft : public StateMachine {
     if (role_ == kLeader)
       throw RaftError("invalid transition [leader -> candidate]");
 
-    currentTerm_++;
-    votedFor_ = id_;  // vote for itself
     role_ = kCandidate;
+    LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
+
+    // vote for itself
+    votedFor_ = id_;
+    voteGranted_[id_] = true;
+    LOG(INFO) << fmt::format("{:x} received MsgVoteResp from {:x} at term {:d}", id_, id_,
+                             currentTerm_);
+
+    currentTerm_++;
     electionElapsed_ = 0;
     currentLeader_ = 0;
     resetRandomizedElectionTimeout();
-    LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
   }
 
   void becomeLeader() {
@@ -217,11 +230,53 @@ class Raft : public StateMachine {
         }
         break;
       default:
-        LOG_ASSERT(false);
+        // ignore unexpected messages
+        break;
     }
   }
 
-  void stepCandidate(const pb::Message& m) {}
+  int granted() const {
+    int gr = 0;
+    for (auto& e : voteGranted_) {
+      gr += e.second;
+    }
+    return gr;
+  }
+
+  void handleMsgVoteResp(const pb::Message& m) {
+    if (m.reject()) {
+      LOG(INFO) << fmt::format("{:x} received {:s} rejection from {:x} at term {:d}", id_,
+                               pb::MessageType_Name(m.type()), m.from(), currentTerm_);
+    } else {
+      LOG(INFO) << fmt::format("{:x} received {:s} from {:x} at term {:d}", id_,
+                               pb::MessageType_Name(m.type()), m.from(), currentTerm_);
+    }
+    voteGranted_[m.from()] = !m.reject();
+
+    int gr = granted();
+    LOG(INFO) << fmt::format(
+        "{:x} [quorum:{:d}] has received {:d} {:s} votes and {:d} vote rejections", id_, quorum(),
+        gr, pb::MessageType_Name(m.type()), voteGranted_.size() - gr);
+
+    if (gr >= quorum()) {
+      becomeLeader();
+      bcastAppend();
+      return;
+    }
+
+    int rejected = static_cast<int>(voteGranted_.size()) - gr;
+    if (rejected >= quorum()) {
+      becomeFollower(m.term(), 0);
+    }
+  }
+
+  void stepCandidate(const pb::Message& m) {
+    switch (m.type()) {
+      case pb::MsgVoteResp:
+        handleMsgVoteResp(m);
+        break;
+    }
+  }
 
   void stepFollower(pb::Message& m) {
     switch (m.type()) {
@@ -290,11 +345,12 @@ class Raft : public StateMachine {
     m.set_from(id_);
 
     if (m.type() == pb::MsgVote) {
-      DLOG_ASSERT(m.term() != 0) << fmt::format("term should be set when sending %s",
-                                                m.GetTypeName());
+      DLOG_ASSERT(m.term() != 0) << fmt::format("term should be set when sending {:s}",
+                                                pb::MessageType_Name(m.type()));
     } else {
       DLOG_ASSERT(m.term() == 0) << fmt::format("term should not be set when sending %s (was %d)",
-                                                m.GetTypeName(), m.term());
+                                                pb::MessageType_Name(m.type()), m.term());
+      m.set_term(currentTerm_);
     }
 
     mails_.push_back(std::move(m));
@@ -302,15 +358,14 @@ class Raft : public StateMachine {
 
   void sendVoteResp(const pb::Message& m, bool reject) {
     LOG(INFO) << fmt::format(
-        "%x [logterm: %d, index: %d, vote: %x] cast %s for %x [logterm: %d, index: %d] at term %d",
-        id_, log_->LastTerm(), log_->LastIndex(), votedFor_, m.GetTypeName(), m.from(), m.logterm(),
-        m.index(), currentTerm_);
+        "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
+        "index: "
+        "{:d}] at term {:d}",
+        id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+        m.from(), m.logterm(), m.index(), currentTerm_);
 
-    pb::Message msgToBeSent;
-    msgToBeSent.set_reject(reject);
-    msgToBeSent.set_to(m.from());
-    msgToBeSent.set_type(pb::MsgVote);
-    send(msgToBeSent);
+    // send() will include term=currentTerm into message.
+    send(PBMessage().Reject(reject).To(m.from()).Type(pb::MsgVoteResp).v);
   }
 
   // promotable indicates whether state machine can be promoted to leader,
@@ -401,17 +456,22 @@ class Raft : public StateMachine {
 
   void campaign(CampaignType type) {
     DLOG_ASSERT(type == kCampaignElection);
+    becomeCandidate();
 
+    auto m = PBMessage()
+                 .Term(currentTerm_)
+                 .Type(pb::MsgVote)
+                 .Index(log_->LastIndex())
+                 .LogTerm(log_->LastTerm());
     for (const auto& e : prs_) {
-      uint64_t pr_id = e.first;
+      uint64_t peer_id = e.first;
+      if (peer_id == id_)
+        continue;
 
-      pb::Message msgToBeSent;
-      msgToBeSent.set_term(currentTerm_);
-      msgToBeSent.set_to(pr_id);
-      msgToBeSent.set_type(pb::MsgVote);
-      msgToBeSent.set_index(log_->LastIndex());
-      msgToBeSent.set_term(log_->LastTerm());
-      send(msgToBeSent);
+      LOG(INFO) << fmt::format(
+          "{:x} [logterm: {:d}, index: {:d}] sent MsgVote to {:x} at term {:d}", id_,
+          log_->LastTerm(), log_->LastIndex(), peer_id, currentTerm_);
+      send(m.To(peer_id).v);
     }
   }
 
@@ -428,6 +488,7 @@ class Raft : public StateMachine {
 
  private:
   friend class RaftTest;
+  friend class Network;
 
   uint64_t id_;
 
@@ -453,6 +514,8 @@ class Raft : public StateMachine {
 
   uint64_t currentTerm_;
   uint64_t votedFor_;  // who we voted for
+
+  std::unordered_map<uint64_t, bool> voteGranted_;
 
   const std::unique_ptr<const Config> c_;
 

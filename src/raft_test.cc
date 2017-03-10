@@ -15,10 +15,7 @@
 
 #include "raft.h"
 #include "memory_storage.h"
-#include "pb_helper.h"
 #include "test_utils.h"
-
-#include <gtest/gtest.h>
 
 namespace yaraft {
 
@@ -242,6 +239,26 @@ class RaftTest {
     raft->Step(PBMessage().From(2).Type(pb::MsgHeartbeatResp).Term(1).v);
     ASSERT_EQ(raft->mails_.size(), 0);
   }
+
+  static void TestSimpleLeaderElection() {
+    auto n = Network::New(3);
+    n->Send(PBMessage().From(1).To(1).Type(pb::MsgHup).v);
+
+    // send request vote from 1 to 2
+    auto vote = n->MustTake(1, 2, pb::MsgVote);
+    n->Send(vote);
+
+    // send request vote from 1 to 3
+    vote = n->MustTake(1, 3, pb::MsgVote);
+    n->Send(vote);
+
+    // grant the vote
+    auto voteResp = n->MustTake(2, 1, pb::MsgVoteResp);
+    n->Send(voteResp);
+
+    // 1 becomes leader
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+  }
 };
 
 }  // namespace yaraft
@@ -264,4 +281,10 @@ TEST(Raft, HandleHeartbeat) {
 
 TEST(Raft, HandleHeartbeatResp) {
   yaraft::RaftTest::TestHandleHeartbeatResp();
+}
+
+TEST(Raft, LogReplication) {}
+
+TEST(Raft, SimpleLeaderElection) {
+  yaraft::RaftTest::TestSimpleLeaderElection();
 }

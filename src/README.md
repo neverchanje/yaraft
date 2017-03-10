@@ -9,6 +9,7 @@
 |Leader|Rejected MsgApp (MsgAppResp with rejection)|Decrease `nextIndex` and retry.|
 |Leader|Committed MsgApp (OK MsgAppResp)|Update `matchIndex` to MsgAppResp.Index `n` if `matchIndex` < `n`. Update `nextIndex` to `n+1` if `nextIndex` < `n+1`. If matchIndex were updated, |
 |Leader|MsgHeartbeatResp|Resend AppendEntries when the follower was detected falling behind.|
+|Leader|MsgVoteResp|[Handle MsgVoteResp](#handle-requestvote-response)|
 |Follower|MsgHup|[Convert to Candidate](#convert-to-candidate-requestvote)|
 |Follower|MsgApp|[Handle AppendEntries](#handle-appendentries)|
 |Follower|MsgTimeoutNow||
@@ -72,6 +73,23 @@
 - Condition for granting the vote: if the MsgVote is at least as "up-to-date" as the voter's latest log,
 and either if we have voted for the same candidate, or we haven't voted for any candidate.
 - Set `votedFor` when we grant the vote.
+
+### Handle RequestVote Response
+
+@see `Raft::handleMsgVoteResp`
+
+RequestVote responses (MsgVoteResp) are received sequentially.
+
+Once the number of granted MsgVoteResps the candidate has received grows to quorum of
+the cluster (`len(peers)/2+1`), it'll convert to leader and broadcast AppendEntries to other
+servers. Likewise, when the number of rejected votes grows to quorum, candidate will immediately
+convert to follower.
+
+Consider a problem: how does the rejected candidate know who is the leader? Actually it doesn't
+know anything about leader.
+
+It's easy to see, after the candidate elected, it still receives MsgVoteResp. 
+But the new leader just ignore them.
 
 ### Handle AppendEntries
 
