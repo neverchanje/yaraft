@@ -17,6 +17,11 @@
 #include "raftpb.pb.h"
 #include "storage.h"
 
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <google/protobuf/text_format.h>
+
 namespace yaraft {
 
 // This file provides utilities to construct protobuf structs in fluent style.
@@ -116,5 +121,16 @@ struct PBSnapshot {
     return *this;
   }
 };
+
+std::string DumpPB(google::protobuf::Message& msg) {
+  std::string msgstr;
+  google::protobuf::TextFormat::PrintToString(msg, &msgstr);
+  boost::trim(msgstr);
+
+  std::vector<std::string> tmp;
+  boost::split(tmp, msgstr, [](char c) { return c == '\n'; });
+  msgstr = boost::join(tmp, ", ");
+  return std::string("{") + msgstr + '}';
+}
 
 }  // namespace yaraft
