@@ -54,9 +54,13 @@ struct Network {
   }
 
   void Send(pb::Message& m) {
-    uint64_t to = m.to();
+    uint64_t to = m.to(), from = m.from();
     if (!peers_[to]) {
       return;
+    }
+
+    if (m.type() != pb::MsgVote) {
+      m.set_term(peers_[from]->currentTerm_);
     }
 
     peers_[to]->Step(m);
@@ -65,7 +69,7 @@ struct Network {
     for (auto& resp : responses) {
       mailTo_[resp.to()].emplace_back(std::move(resp));
     }
-    DLOG_ASSERT(!responses.empty());
+    responses.clear();
   }
 
   // take responses from mailbox
@@ -187,18 +191,6 @@ inline bool operator==(EntryVec v1, EntryVec v2) {
       return false;
   }
   return true;
-}
-
-inline std::ostream& operator<<(std::ostream& os, const pb::Entry& e) {
-  return os << "{Index: " << e.index() << ", Term: " << e.term() << "}";
-}
-
-inline std::ostream& operator<<(std::ostream& os, const EntryVec& v) {
-  os << "Size of entry vec: " << v.size() << ". | ";
-  for (const auto& e : v) {
-    os << e << " | ";
-  }
-  return os << "\n";
 }
 
 uint64_t mustTerm(const RaftLog& log, uint64_t index) {

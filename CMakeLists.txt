@@ -47,4 +47,4 @@ file(GLOB YARAFT_HEADER "include/*.h")
 install(FILES ${YARAFT_HEADER} DESTINATION include/yaraft)
 
 file(GLOB YARAFT_SOURCE "*/*.h" "*/*.cc")
-add_executable(fuck_clion ${YARAFT_SOURCE} src/unique_ptr.h)
+add_executable(fuck_clion ${YARAFT_SOURCE})
