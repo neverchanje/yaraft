@@ -47,8 +47,18 @@ struct Network {
     }
   }
 
+  ~Network() {
+    for (auto& e : peers_) {
+      delete e.second;
+    }
+  }
+
   void Send(pb::Message& m) {
     uint64_t to = m.to();
+    if (!peers_[to]) {
+      return;
+    }
+
     peers_[to]->Step(m);
 
     auto& responses = peers_[to]->mails_;
@@ -103,11 +113,21 @@ struct Network {
     return peers_[id];
   }
 
+  uint64_t PeerSize() const {
+    return peers_.size();
+  }
+
   Network* Set(Config* conf) {
     if (peers_.find(conf->id) != peers_.end()) {
       delete peers_[conf->id];
     }
     peers_[conf->id] = new Raft(conf);
+    return this;
+  }
+
+  Network* Down(uint64_t id) {
+    delete peers_[id];
+    peers_[id] = nullptr;
     return this;
   }
 

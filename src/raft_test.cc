@@ -27,7 +27,7 @@ class RaftTest {
     RaftUPtr raft(newTestRaft(1, {1}, 10, 1, new MemoryStorage()));
 
     bool called = false;
-    raft->step_ = [&](const pb::Message &m) { called = true; };
+    raft->step_ = [&](const pb::Message& m) { called = true; };
 
     raft->currentTerm_ = 2;
 
@@ -171,7 +171,7 @@ class RaftTest {
             raft->becomeLeader();
             break;
         }
-      } catch (RaftError &e) {
+      } catch (RaftError& e) {
         failed = true;
       }
       ASSERT_EQ(!t.wallow, failed);
@@ -240,24 +240,55 @@ class RaftTest {
     ASSERT_EQ(raft->mails_.size(), 0);
   }
 
-  static void TestSimpleLeaderElection() {
-    auto n = Network::New(3);
+  static void RaiseElection(Network* n) {
     n->Send(PBMessage().From(1).To(1).Type(pb::MsgHup).v);
 
-    // send request vote from 1 to 2
-    auto vote = n->MustTake(1, 2, pb::MsgVote);
-    n->Send(vote);
+    // Broadcast request votes to peers
+    for (uint64_t id = 2; id <= n->PeerSize(); id++) {
+      auto vote = n->MustTake(1, id, pb::MsgVote);
+      n->Send(vote);
+    }
 
-    // send request vote from 1 to 3
-    vote = n->MustTake(1, 3, pb::MsgVote);
-    n->Send(vote);
+    // Receive vote responses
+    for (uint64_t id = 2; id <= n->PeerSize(); id++) {
+      auto voteResp = n->Take(id, 1);
+      if (voteResp) {
+        DLOG_ASSERT(voteResp->type() == pb::MsgVoteResp);
+        n->Send(*voteResp);
+      }
+    }
+  }
 
-    // grant the vote
-    auto voteResp = n->MustTake(2, 1, pb::MsgVoteResp);
-    n->Send(voteResp);
+  static void TestLeaderElection() {
+    struct TestData {
+      Network* network;
+      Raft::StateRole role;
 
-    // 1 becomes leader
-    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+      uint64_t wterm;
+    } tests[] = {
+        // three nodes, all healthy
+        {Network::New(3), Raft::kLeader, 1},
+
+        // three nodes, one sick
+        {Network::New(3)->Down(2), Raft::kLeader, 1},
+
+        // three nodes, two sick
+        {Network::New(3)->Down(2)->Down(3), Raft::kCandidate, 1},
+
+        // four nodes, two sick
+        {Network::New(4)->Down(2)->Down(3), Raft::kCandidate, 1},
+
+        // five nodes, two sick
+        {Network::New(5)->Down(2)->Down(3), Raft::kLeader, 1},
+    };
+
+    for (auto t : tests) {
+      RaiseElection(t.network);
+
+      auto node = t.network->Peer(1);
+      ASSERT_EQ(node->role_, t.role);
+      ASSERT_EQ(node->currentTerm_, t.wterm);
+    }
   }
 };
 
@@ -285,6 +316,6 @@ TEST(Raft, HandleHeartbeatResp) {
 
 TEST(Raft, LogReplication) {}
 
-TEST(Raft, SimpleLeaderElection) {
-  yaraft::RaftTest::TestSimpleLeaderElection();
+TEST(Raft, LeaderElection) {
+  yaraft::RaftTest::TestLeaderElection();
 }
