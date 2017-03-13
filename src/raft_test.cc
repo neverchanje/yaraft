@@ -240,21 +240,24 @@ class RaftTest {
     ASSERT_EQ(raft->mails_.size(), 0);
   }
 
-  static void RaiseElection(Network* n) {
-    n->Send(PBMessage().From(1).To(1).Type(pb::MsgHup).v);
+  static void RaiseElection(Network* n, uint64_t cand = 1) {
+    n->Send(PBMessage().From(cand).To(cand).Type(pb::MsgHup).v);
 
     // Broadcast request votes to peers
-    for (uint64_t id = 2; id <= n->PeerSize(); id++) {
-      auto vote = n->MustTake(1, id, pb::MsgVote);
+    for (uint64_t id = 1; id <= n->PeerSize(); id++) {
+      if (id == cand)
+        continue;
+      auto vote = n->MustTake(cand, id, pb::MsgVote);
       n->Send(vote);
     }
 
     // Receive vote responses
-    for (uint64_t id = 2; id <= n->PeerSize(); id++) {
-      auto voteResp = n->Take(id, 1);
-      if (voteResp) {
-        DLOG_ASSERT(voteResp->type() == pb::MsgVoteResp);
-        n->Send(*voteResp);
+    for (uint64_t id = 1; id <= n->PeerSize(); id++) {
+      if (id == cand)
+        continue;
+      if (n->Peer(id)) {
+        auto voteResp = n->MustTake(id, 1, pb::MsgVoteResp);
+        n->Send(voteResp);
       }
     }
   }
@@ -290,6 +293,21 @@ class RaftTest {
       ASSERT_EQ(node->currentTerm_, t.wterm);
     }
   }
+
+  // TestLeaderCycle verifies that each node in a cluster can campaign
+  // and be elected in turn. This ensures that elections (including
+  // pre-vote) work when not starting from a clean slate (as they do in
+  // TestLeaderElection)
+  static void TestLeaderCycle() {
+    Network* n = Network::New(4);
+    for (uint64_t cand = 1; cand <= 3; cand++) {
+      RaiseElection(n, cand);
+
+      for (uint64_t id = 1; id <= 3; id++) {
+        ASSERT_EQ(n->Peer(id)->role_, cand == id ? Raft::kLeader : Raft::kFollower);
+      }
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -318,4 +336,8 @@ TEST(Raft, LogReplication) {}
 
 TEST(Raft, LeaderElection) {
   yaraft::RaftTest::TestLeaderElection();
+}
+
+TEST(Raft, LeaderCycle) {
+  yaraft::RaftTest::TestLeaderCycle();
 }
