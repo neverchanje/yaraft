@@ -384,7 +384,7 @@ class Raft : public StateMachine {
     for (const auto& e : prs_) {
       if (id_ == e.first)
         continue;
-      sendAppend(id_);
+      sendAppend(e.first);
     }
   }
 
