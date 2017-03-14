@@ -30,13 +30,10 @@
 
 #include <fmt/format.h>
 #include <glog/logging.h>
-#include <gtest/gtest-spi.h>
 
 namespace yaraft {
 
 class Raft : public StateMachine {
-  enum StateRole { kFollower, kCandidate, kLeader };
-
   enum CampaignType {
     // kCampaignElection represents a normal (time-based) election (the second phase
     // of the election when Config.preVote is true).
@@ -44,6 +41,8 @@ class Raft : public StateMachine {
   };
 
  public:
+  enum StateRole { kFollower, kCandidate, kLeader };
+
   explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {
     LOG_ASSERT(conf->Validate());
 
@@ -488,6 +487,7 @@ class Raft : public StateMachine {
 
  private:
   friend class RaftTest;
+  friend class RaftPaperTest;
   friend class Network;
 
   uint64_t id_;
