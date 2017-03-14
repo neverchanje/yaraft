@@ -90,6 +90,48 @@ class RaftPaperTest {
 
     ASSERT_EQ(s1, s2);
   }
+
+  // TestNonleaderStartElection tests that if a follower receives no communication
+  // over election timeout, it begins an election to choose a new leader. It
+  // increments its current term and transitions to candidate state. It then
+  // votes for itself and issues RequestVote RPCs in parallel to each of the
+  // other servers in the cluster.
+  // Reference: section 5.2
+  // Also if a candidate fails to obtain a majority, it will time out and
+  // start a new election by incrementing its term and initiating another
+  // round of RequestVote RPCs.
+  // Reference: section 5.2
+  static void TestNonleaderStartElection(Raft::StateRole role) {
+    int electionTimeout = 10;
+    RaftUPtr r(newTestRaft(1, {1, 2, 3}, electionTimeout, 1, new MemoryStorage()));
+
+    if (role == Raft::kFollower) {
+      // term = 1, lead = 2
+      r->becomeFollower(1, 2);
+    } else if (role == Raft::kCandidate) {
+      r->becomeCandidate();
+    }
+
+    for (int i = 0; i < 2 * electionTimeout; i++) {
+      r->_tick();
+    }
+
+    ASSERT_EQ(r->currentTerm_, 2);
+    ASSERT_EQ(r->role_, Raft::kCandidate);
+
+    // vote for self
+    ASSERT_EQ(r->votedFor_, r->id_);
+    ASSERT_TRUE(r->voteGranted_[r->id_]);
+
+    std::unordered_set<std::string> s1;
+    std::for_each(r->mails_.begin(), r->mails_.end(),
+                  [&](const pb::Message& m) { s1.insert(DumpPB(m)); });
+
+    std::unordered_set<std::string> s2;
+    s2.insert(DumpPB(PBMessage().From(1).To(2).Term(2).LogTerm(0).Index(0).Type(pb::MsgVote).v));
+    s2.insert(DumpPB(PBMessage().From(1).To(3).Term(2).LogTerm(0).Index(0).Type(pb::MsgVote).v));
+    ASSERT_EQ(s1, s2);
+  }
 };
 
 }  // namespace yaraft
@@ -114,4 +156,12 @@ TEST(Raft, StartAsFollower) {
 
 TEST(Raft, LeaderBcastBeat) {
   RaftPaperTest::TestLeaderBcastBeat();
+}
+
+TEST(Raft, FollowerStartElection) {
+  RaftPaperTest::TestNonleaderStartElection(Raft::kFollower);
+}
+
+TEST(Raft, CandidateStartNewElection) {
+  RaftPaperTest::TestNonleaderStartElection(Raft::kCandidate);
 }

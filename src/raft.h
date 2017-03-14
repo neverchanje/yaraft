@@ -328,11 +328,7 @@ class Raft : public StateMachine {
 
     if (promotable() && electionElapsed_ >= randomizedElectionTimeout_) {
       electionElapsed_ = 0;
-
-      pb::Message msg;
-      msg.set_from(id_);
-      msg.set_type(pb::MsgHup);
-      Step(msg);
+      Step(PBMessage().From(id_).Type(pb::MsgHup).Term(currentTerm_).v);
     }
   }
 
