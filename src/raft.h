@@ -319,11 +319,7 @@ class Raft : public StateMachine {
 
     if (heartbeatElapsed_ >= c_->heartbeatTick) {
       heartbeatElapsed_ = 0;
-
-      pb::Message msg;
-      msg.set_from(id_);
-      msg.set_type(pb::MsgBeat);
-      Step(msg);
+      bcastHeartbeat();
     }
   }
 
@@ -369,13 +365,15 @@ class Raft : public StateMachine {
 
   // promotable indicates whether state machine can be promoted to leader,
   // which is true when its own id is in progress list.
-  bool promotable() const;
+  bool promotable() const {
+    return true;
+  }
 
   void bcastHeartbeat() {
     for (const auto& e : prs_) {
       if (id_ == e.first)
         continue;
-      sendHeartbeat(id_);
+      sendHeartbeat(e.first);
     }
   }
 
@@ -412,11 +410,11 @@ class Raft : public StateMachine {
     // The leader MUST NOT forward the follower's commit to
     // an unmatched index, in order to preserving Log Matching Property.
 
-    pb::Message msgToBeSent;
-    msgToBeSent.set_to(to);
-    msgToBeSent.set_type(pb::MsgHeartbeat);
-    msgToBeSent.set_commit(std::min(prs_[to].MatchIndex(), log_->CommitIndex()));
-    send(msgToBeSent);
+    auto m = PBMessage()
+                 .To(to)
+                 .Type(pb::MsgHeartbeat)
+                 .Commit(std::min(prs_[to].MatchIndex(), log_->CommitIndex()));
+    send(m.v);
   }
 
   void handleMsgHeartbeatResp(const pb::Message& m) {}

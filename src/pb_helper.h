@@ -122,7 +122,7 @@ struct PBSnapshot {
   }
 };
 
-std::string DumpPB(google::protobuf::Message& msg) {
+std::string DumpPB(const google::protobuf::Message& msg) {
   std::string msgstr;
   google::protobuf::TextFormat::PrintToString(msg, &msgstr);
   boost::trim(msgstr);
