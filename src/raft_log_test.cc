@@ -17,6 +17,8 @@
 #include "memory_storage.h"
 #include "test_utils.h"
 
+#include <gtest/gtest.h>
+
 using namespace yaraft;
 
 TEST(RaftLog, IsUpToDate) {}

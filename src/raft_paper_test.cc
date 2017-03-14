@@ -132,6 +132,46 @@ class RaftPaperTest {
     s2.insert(DumpPB(PBMessage().From(1).To(3).Term(2).LogTerm(0).Index(0).Type(pb::MsgVote).v));
     ASSERT_EQ(s1, s2);
   }
+
+  // TestVoter tests the voter denies its vote if its own log is more up-to-date
+  // than that of the candidate.
+  // Reference: section 5.4.1
+  static void TestVoter() {
+    struct TestData {
+      EntryVec ents;
+      uint64_t index;
+      uint64_t logterm;
+
+      bool wreject;
+    } tests[] = {
+        // same logterm
+        {{pbEntry(1, 1)}, 1, 1, false},
+        {{pbEntry(1, 1)}, 2, 1, false},
+        {{pbEntry(1, 1), pbEntry(2, 1)}, 1, 1, true},
+        {{pbEntry(1, 1), pbEntry(2, 1)}, 2, 1, false},
+
+        // candidate higher logterm
+        {{pbEntry(1, 1)}, 1, 2, false},
+        {{pbEntry(1, 1)}, 2, 2, false},
+        {{pbEntry(1, 1), pbEntry(2, 1)}, 1, 2, false},
+
+        // voter higher logterm
+        {{pbEntry(1, 2)}, 1, 1, true},
+        {{pbEntry(1, 2)}, 2, 1, true},
+        {{pbEntry(1, 1), pbEntry(2, 2)}, 1, 1, true},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage(t.ents)));
+      r->Step(
+          PBMessage().From(2).To(1).Type(pb::MsgVote).Term(3).LogTerm(t.logterm).Index(t.index).v);
+
+      ASSERT_EQ(r->mails_.size(), 1);
+      auto& m = r->mails_[0];
+      ASSERT_EQ(m.type(), pb::MsgVoteResp);
+      ASSERT_EQ(m.reject(), t.wreject);
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -164,4 +204,8 @@ TEST(Raft, FollowerStartElection) {
 
 TEST(Raft, CandidateStartNewElection) {
   RaftPaperTest::TestNonleaderStartElection(Raft::kCandidate);
+}
+
+TEST(Raft, Voter) {
+  RaftPaperTest::TestVoter();
 }
