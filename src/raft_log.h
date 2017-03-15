@@ -251,6 +251,17 @@ class RaftLog {
     return lastApplied_;
   }
 
+  uint64_t ZeroTermOnErrCompacted(uint64_t index) {
+    auto st = Term(index);
+    if (!st.OK()) {
+      if (st.GetStatus().Code() == Error::LogCompacted) {
+        return 0;
+      }
+      LOG(FATAL) << st.GetStatus();
+    }
+    return st.GetValue();
+  }
+
  private:
   // storage contains all stable entries since the last snapshot.
   std::unique_ptr<Storage> storage_;

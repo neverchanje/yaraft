@@ -122,6 +122,20 @@ struct PBSnapshot {
   }
 };
 
+struct PBHardState {
+  pb::HardState v;
+
+  PBHardState& Vote(uint64_t vote) {
+    v.set_vote(vote);
+    return *this;
+  }
+
+  PBHardState& Term(uint64_t term) {
+    v.set_term(term);
+    return *this;
+  }
+};
+
 std::string DumpPB(const google::protobuf::Message& msg) {
   std::string msgstr;
   google::protobuf::TextFormat::PrintToString(msg, &msgstr);

@@ -310,6 +310,50 @@ class RaftTest {
       }
     }
   }
+
+  static void TestCommit() {
+    struct TestData {
+      std::vector<uint64_t> matches;
+      EntryVec logs;
+      uint64_t smTerm;
+
+      uint64_t wcommit;
+    } tests[] = {
+
+        /// single
+        {{1}, {pbEntry(1, 1)}, 1, 1},
+        {{1}, {pbEntry(1, 1)}, 2, 0},  // not commit in newer term
+        {{2}, {pbEntry(1, 1), pbEntry(2, 2)}, 2, 2},
+        {{1}, {pbEntry(1, 2)}, 2, 1},
+
+        // odd
+        {{2, 1, 1}, {pbEntry(1, 1), pbEntry(2, 1)}, 1, 1},
+        {{2, 1, 1}, {pbEntry(1, 1), pbEntry(2, 1)}, 2, 0},
+        {{2, 1, 2}, {pbEntry(1, 1), pbEntry(2, 2)}, 2, 2},
+        {{2, 1, 2}, {pbEntry(1, 1), pbEntry(2, 1)}, 2, 0},
+
+        // odd
+        {{2, 1, 1, 1}, {pbEntry(1, 1), pbEntry(2, 2)}, 1, 1},
+        {{2, 1, 1, 1}, {pbEntry(1, 1), pbEntry(2, 1)}, 2, 0},
+        {{2, 1, 1, 2}, {pbEntry(1, 1), pbEntry(2, 2)}, 1, 1},
+        {{2, 1, 1, 2}, {pbEntry(1, 1), pbEntry(2, 1)}, 2, 0},
+        {{2, 1, 2, 2}, {pbEntry(1, 1), pbEntry(2, 2)}, 2, 2},
+        {{2, 1, 2, 2}, {pbEntry(1, 1), pbEntry(2, 1)}, 2, 0},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, {1}, 5, 1, new MemoryStorage(t.logs)));
+      r->loadState(PBHardState().Term(t.smTerm).v);
+      r->role_ = Raft::kLeader;
+
+      for (int i = 0; i < t.matches.size(); i++) {
+        uint64_t id = static_cast<uint64_t>(i + 1);
+        r->prs_[id] = Progress().MatchIndex(t.matches[i]).NextIndex(t.matches[i] + 1);
+      }
+      r->advanceCommitIndex();
+      ASSERT_EQ(r->log_->CommitIndex(), t.wcommit);
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -342,4 +386,8 @@ TEST(Raft, LeaderElection) {
 
 TEST(Raft, LeaderCycle) {
   yaraft::RaftTest::TestLeaderCycle();
+}
+
+TEST(Raft, Commit) {
+  yaraft::RaftTest::TestCommit();
 }

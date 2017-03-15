@@ -10,6 +10,7 @@
 |Leader|Committed MsgApp (OK MsgAppResp)|Update `matchIndex` to MsgAppResp.Index `n` if `matchIndex` < `n`. Update `nextIndex` to `n+1` if `nextIndex` < `n+1`. If matchIndex were updated, |
 |Leader|MsgHeartbeatResp|Resend AppendEntries when the follower was detected falling behind.|
 |Leader|MsgVoteResp|[Handle MsgVoteResp](#handle-requestvote-response)|
+|Leader|MsgProp|Handle MsgProp|
 |Follower|MsgHup|[Convert to Candidate](#convert-to-candidate-requestvote)|
 |Follower|MsgApp|[Handle AppendEntries](#handle-appendentries)|
 |Follower|MsgTimeoutNow||
@@ -55,9 +56,11 @@
 
 ### Convert to Leader (BecomeLeader)
 
+@see `Raft::becomeLeader`
+
 1. Assert(state == Candidate)
 2. Set `currentLeader` to itself.
-3. Reinitialize `nextIndex[]`, and `matchIndex[]`.
+3. Reinitialize `nextIndex[]`, and `matchIndex[]`. 
 
 ### Timer
 - heartbeat timer
@@ -117,19 +120,32 @@ Given a corner case: What if `commitIndex > prevLogIndex` ?
 delete the existing entry and all that follow it.
 - Append any new entries not already in the log.
 
-#### MsgAppResp
+@see `Progress::MaybeUpdate`
+
+- Update the matchIndex and nextIndex of the follower, when a successful MsgAppResp is returned.
+
+### Handle MsgProp
+
+#### Leader 
+
+@see `Raft::leaderHandleMsgProp` 
+
+Add entries to log and broadcast AppendEntries to all peers.
+
+
+
+### Single-Node Cluster
+
+If there's only a single node in the cluster, whenever it receives a MsgHup, 
+it will immediately convert to Leader state.
+
+## Messages
+
+### MsgAppResp
 
 |Arguments||
 |-------|---|
 |Reject|True if the AppendEntries failed.|
 |RejectHint|Returns index of the last log entry. Empty if the AppendEntries is accepted.|
 |Index|If rejected, returns prevLogIndex, otherwise returns index of the last entry.|
-
-@see `Progress::MaybeUpdate`
-
-- Update the matchIndex and nextIndex of the follower, when a successful MsgAppResp is returned.
-
-### Single-Node Cluster
-
-If there's only a single node in the cluster, whenever it receives a MsgHup, 
-it will immediately convert to Leader state.
+|Term||

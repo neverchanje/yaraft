@@ -51,9 +51,10 @@ class Raft : public StateMachine {
 
     pb::HardState hardState;
     auto s = c_->storage->InitialState(&hardState, nullptr);
-    LOG_ASSERT(s.IsOK());
-    currentTerm_ = hardState.term();
-    votedFor_ = hardState.vote();
+    if (!s) {
+      LOG(FATAL) << s;
+    }
+    loadState(hardState);
 
     becomeFollower(currentTerm_, 0);
 
@@ -181,20 +182,22 @@ class Raft : public StateMachine {
     heartbeatElapsed_ = 0;
     currentLeader_ = id_;
     prs_.clear();
+
     for (uint64_t id : c_->peers) {
-      auto& pr = prs_[id] = Progress().NextIndex(log_->LastIndex() + 1);
-      if (id == id_) {
-        pr.MatchIndex(log_->LastIndex());
-      }
+      prs_[id] = Progress().NextIndex(log_->LastIndex() + 1);
     }
+    prs_[id_].MatchIndex(log_->LastIndex());
 
     LOG(INFO) << id_ << " became leader at term " << currentTerm_;
   }
 
-  void stepLeader(const pb::Message& m) {
+  void stepLeader(pb::Message& m) {
     switch (m.type()) {
       case pb::MsgBeat:
         bcastHeartbeat();
+        return;
+      case pb::MsgProp:
+        leaderHandleMsgProp(m);
         return;
       default:
         break;
@@ -220,6 +223,7 @@ class Raft : public StateMachine {
           }
         } else {
           if (pr.MaybeUpdate(m.index())) {
+            advanceCommitIndex();
           }
         }
         break;
@@ -300,8 +304,10 @@ class Raft : public StateMachine {
     }
   }
 
-  void loadState(pb::HardState state);
-  pb::HardState hardState() const;
+  void loadState(pb::HardState state) {
+    currentTerm_ = state.term();
+    votedFor_ = state.vote();
+  }
 
   void _tick() {
     switch (role_) {
@@ -436,8 +442,26 @@ class Raft : public StateMachine {
     }
   }
 
+  void leaderHandleMsgProp(pb::Message& m) {
+    log_->Append(m.mutable_entries()->begin(), m.mutable_entries()->end());
+    bcastAppend();
+  }
+
+  // advanceCommitIndex advances commitIndex to the largest index of log having
+  // replicated on majority, except When leader's currentTerm is not equal to
+  // term of the index (which means it's a new leader).
   void advanceCommitIndex() {
     DLOG_ASSERT(role_ == StateRole::kLeader);
+    std::vector<uint64_t> matches;
+    for (auto& e : prs_) {
+      matches.push_back(e.second.MatchIndex());
+    }
+    std::sort(matches.begin(), matches.end(), std::greater<uint64_t>());
+
+    uint64_t to = matches[quorum() - 1];
+    if (log_->ZeroTermOnErrCompacted(to) == currentTerm_) {
+      log_->CommitTo(to);
+    }
   }
 
   void handleHeartbeat(const pb::Message& m) {
