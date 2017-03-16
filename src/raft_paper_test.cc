@@ -216,6 +216,56 @@ class RaftPaperTest {
       ASSERT_EQ(r->log_->CommitIndex(), t.wcommit);
     }
   }
+
+  // TestVoteRequest tests that the vote request includes information about the candidate’s log
+  // and are sent to all of the other nodes.
+  // Reference: section 5.4.1
+  static void TestVoteRequest() {
+    struct TestData {
+      EntryVec ents;
+      uint64_t wterm;
+    } tests[] = {
+        // {{pbEntry(1, 1)}, 2},
+        {{pbEntry(1, 1), pbEntry(2, 2)}, 3},
+    };
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage()));
+
+      // receiving MsgApp from higher term,
+      // r will convert to follower and set currentTerm to t.wterm - 1
+      // and append t.ents to log.
+      r->Step(PBMessage()
+                  .From(2)
+                  .To(1)
+                  .Type(pb::MsgApp)
+                  .Term(t.wterm - 1)
+                  .LogTerm(0)
+                  .Index(0)
+                  .Entries(t.ents)
+                  .v);
+      r->mails_.clear();
+
+      for (int i = 0; i < r->c_->electionTick * 2 - 1; i++) {
+        r->_tick();
+      }
+
+      ASSERT_EQ(r->mails_.size(), 2);
+
+      uint64_t wlogterm = t.ents.rbegin()->term();
+      uint64_t windex = t.ents.rbegin()->index();
+      for (int i = 0; i < 2; i++) {
+        ASSERT_EQ(r->mails_[i].type(), pb::MsgVote);
+        ASSERT_EQ(r->mails_[i].term(), t.wterm);
+
+        ASSERT_EQ(r->mails_[i].logterm(), wlogterm);
+        ASSERT_EQ(r->mails_[i].index(), windex);
+        ASSERT_EQ(r->mails_[i].term(), t.wterm);
+      }
+
+      std::set<uint64_t> to{r->mails_[0].to(), r->mails_[1].to()};
+      ASSERT_EQ(to, std::set<uint64_t>({2, 3}));
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -256,4 +306,8 @@ TEST(Raft, Voter) {
 
 TEST(Raft, LeaderOnlyCommitsLogFromCurrentTerm) {
   RaftPaperTest::TestLeaderOnlyCommitsLogFromCurrentTerm();
+}
+
+TEST(Raft, VoteRequest) {
+  RaftPaperTest::TestVoteRequest();
 }
