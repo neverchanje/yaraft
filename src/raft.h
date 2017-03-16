@@ -206,26 +206,11 @@ class Raft : public StateMachine {
     DLOG_ASSERT(prs_.find(m.from()) != prs_.end())
         << fmt::format("{:x} no progress available for {:x}", id_, m.from());
 
-    auto& pr = prs_[m.to()];
+    auto& pr = prs_[m.from()];
 
     switch (m.type()) {
       case pb::MsgAppResp:
-        if (m.reject()) {
-          DLOG(INFO) << fmt::format(
-              "%x received msgApp rejection(lastindex: %d) from %x for index %d", id_,
-              m.rejecthint(), m.from(), m.index());
-
-          if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
-            // retry with a smaller index
-            DLOG(INFO) << fmt::format("%x decreased progress of %x to [%s]", id_, m.from(),
-                                      pr.ToString());
-            sendAppend(m.from());
-          }
-        } else {
-          if (pr.MaybeUpdate(m.index())) {
-            advanceCommitIndex();
-          }
-        }
+        handleMsgAppResp(m);
         break;
       case pb::MsgHeartbeatResp:
         if (pr.MatchIndex() < log_->LastIndex()) {
@@ -421,7 +406,24 @@ class Raft : public StateMachine {
 
   void handleMsgHeartbeatResp(const pb::Message& m) {}
 
-  void handleMsgAppResp(const pb::Message& m) {}
+  void handleMsgAppResp(const pb::Message& m) {
+    auto& pr = prs_[m.from()];
+    if (m.reject()) {
+      DLOG(INFO) << fmt::format("%x received msgApp rejection(lastindex: %d) from %x for index %d",
+                                id_, m.rejecthint(), m.from(), m.index());
+
+      if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
+        // retry with a smaller index
+        DLOG(INFO) << fmt::format("%x decreased progress of %x to [%s]", id_, m.from(),
+                                  pr.ToString());
+        sendAppend(m.from());
+      }
+    } else {
+      if (pr.MaybeUpdate(m.index())) {
+        advanceCommitIndex();
+      }
+    }
+  }
 
   void handleAppendEntries(pb::Message& m) {
     DLOG_ASSERT(role_ == StateRole::kFollower);
@@ -443,7 +445,15 @@ class Raft : public StateMachine {
   }
 
   void leaderHandleMsgProp(pb::Message& m) {
+    auto entries = m.mutable_entries();
+    uint64_t li = log_->LastIndex(), i = 1;
+    for (auto it = entries->begin(); it != entries->end(); it++) {
+      it->set_term(currentTerm_);
+      it->set_index(li + i);
+      i++;
+    }
     log_->Append(m.mutable_entries()->begin(), m.mutable_entries()->end());
+    prs_[id_].MaybeUpdate(log_->LastIndex());
     bcastAppend();
   }
 

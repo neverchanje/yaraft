@@ -130,9 +130,15 @@ delete the existing entry and all that follow it.
 
 @see `Raft::leaderHandleMsgProp` 
 
-Add entries to log and broadcast AppendEntries to all peers.
+When MsgProp is passed to leader, each of the log entries in message should be included with
+`term = leader's currentTerm` and `index = index of last entry + offset`.
+And the entries will be appended to leader's log.
 
+After that leader will update `MatchIndex[]`, `NextIndex[]`, and broadcast AppendEntries to all peers.
 
+### Handle MsgAppResp
+
+Once leader receives a MsgAppResp, 
 
 ### Single-Node Cluster
 

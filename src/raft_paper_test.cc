@@ -172,6 +172,50 @@ class RaftPaperTest {
       ASSERT_EQ(m.reject(), t.wreject);
     }
   }
+
+  // TestLeaderOnlyCommitsLogFromCurrentTerm tests that only log entries from the leader’s
+  // current term are committed by counting replicas.
+  // Reference: section 5.4.2
+  static void TestLeaderOnlyCommitsLogFromCurrentTerm() {
+    struct TestData {
+      uint64_t index;
+
+      uint64_t wcommit;
+    } tests[] = {
+        {1, 0},  // index 1 replicated on majority, but with older term = 1, currentTerm = 3
+        {2, 0},  // index 2 replicated on majority, but with older term = 2, currentTerm = 3
+
+        {3, 3},  // index 3 replicated on majority,
+    };
+
+    for (auto t : tests) {
+      auto memstore = new MemoryStorage({pbEntry(1, 1), pbEntry(2, 2)});
+      RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, memstore));
+      r->loadState(PBHardState().Term(2).v);
+
+      // become leader at term 3
+      r->becomeCandidate();
+      r->becomeLeader();
+      r->mails_.clear();
+      ASSERT_EQ(r->prs_[1].MatchIndex(), 2);
+      ASSERT_EQ(r->currentTerm_, 3);
+
+      // append a empty entry with index = 3
+      r->Step(PBMessage()
+                  .From(1)
+                  .To(1)
+                  .Type(pb::MsgProp)
+                  .Term(r->currentTerm_)
+                  .Entries({pb::Entry()})
+                  .v);
+      ASSERT_EQ(r->prs_[1].MatchIndex(), 3);
+
+      r->Step(
+          PBMessage().From(2).To(1).Type(pb::MsgAppResp).Term(r->currentTerm_).Index(t.index).v);
+
+      ASSERT_EQ(r->log_->CommitIndex(), t.wcommit);
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -208,4 +252,8 @@ TEST(Raft, CandidateStartNewElection) {
 
 TEST(Raft, Voter) {
   RaftPaperTest::TestVoter();
+}
+
+TEST(Raft, LeaderOnlyCommitsLogFromCurrentTerm) {
+  RaftPaperTest::TestLeaderOnlyCommitsLogFromCurrentTerm();
 }
