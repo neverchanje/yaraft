@@ -109,8 +109,10 @@ class MemoryStorage : public Storage {
 
  public:
   MemoryStorage() {
-    // When starting from scratch populate the list with a dummy entry at term zero.
-    entries_.push_back(pb::Entry());
+    // When starting from scratch populate the list with a dummy entry at term zero,
+    // so AppendEntries can be applied with prevLogIndex=0, prevLogTerm=0 when there's no
+    // entries in storage.
+    entries_.push_back(PBEntry().Index(0).Term(0).v);
   }
 
   explicit MemoryStorage(EntryVec vec) : MemoryStorage() {

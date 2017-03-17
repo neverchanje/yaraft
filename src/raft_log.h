@@ -121,28 +121,28 @@ class RaftLog {
     return false;
   }
 
-  uint64_t Append(pb::Entry e) {
+  void Append(pb::Entry e) {
     auto msg = PBMessage().Entries({e}).v;
-    return Append(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
+    Append(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
   }
 
-  uint64_t Append(EntryVec vec) {
+  void Append(EntryVec vec) {
     auto msg = PBMessage().Entries(vec).v;
-    return Append(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
+    Append(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
   }
 
   // Appends entries into unstable.
-  // Returns last index of new entries.
-  uint64_t Append(EntriesIterator begin, EntriesIterator end) {
+  // Entries between begin and end must be ensured not identical with the existing log entries.
+  void Append(EntriesIterator begin, EntriesIterator end) {
     if (begin == end) {
-      return LastIndex();
+      return;
     }
+
     if (begin->index() <= commitIndex_) {
       throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(),
                       commitIndex_);
     }
     unstable_.TruncateAndAppend(begin, end);
-    return LastIndex();
   }
 
   void CommitTo(uint64_t to) {
@@ -164,6 +164,8 @@ class RaftLog {
     uint64_t prevLogTerm = m.logterm();
 
     if (HasEntry(prevLogIndex, prevLogTerm)) {
+      *newLastIndex = prevLogIndex + m.entries_size();
+
       if (m.entries_size() > 0) {
         // An entry in raft log that doesn't exist in MsgApp is defined as conflicted.
         // MaybeAppend deletes the conflicted entry and all that follows it from raft log,
@@ -181,16 +183,8 @@ class RaftLog {
           begin++;
         }
 
-        // *begin is the first entry conflicted with the log.
-        if (begin != end) {
-          if (begin->index() < CommitIndex()) {
-            throw RaftError("entry {:d} conflict with committed entry [committed({:d})]",
-                            begin->index(), CommitIndex());
-          }
-          Append(begin, end);
-        }
+        Append(begin, end);
       }
-      *newLastIndex = prevLogIndex + m.entries_size();
       return true;
     }
     *newLastIndex = 0;
@@ -260,6 +254,21 @@ class RaftLog {
       LOG(FATAL) << st.GetStatus();
     }
     return st.GetValue();
+  }
+
+ public:
+  /// Only used for test
+
+  EntryVec AllEntries() {
+    auto s = Entries(FirstIndex(), LastIndex() + 1, std::numeric_limits<uint64_t>::max());
+    if (!s.OK()) {
+      DLOG(FATAL) << s.GetStatus();
+    }
+    return s.GetValue();
+  }
+
+  Unstable& TEST_Unstable() {
+    return unstable_;
   }
 
  private:

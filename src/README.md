@@ -119,6 +119,10 @@ Given a corner case: What if `commitIndex > prevLogIndex` ?
 - If an existing entry conflicts with a new one (same index but different terms), 
 delete the existing entry and all that follow it.
 - Append any new entries not already in the log.
+- NOTE: logs are first saved in `unstable`, until the library user flushing 
+them into storage.
+- NOTE: If MaybeAppend tries to append an array entries and all of which are existed, it will not
+delete the following log entries. The deleted should only follows an conflicted one.
 
 @see `Progress::MaybeUpdate`
 

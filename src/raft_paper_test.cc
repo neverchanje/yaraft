@@ -266,6 +266,51 @@ class RaftPaperTest {
       ASSERT_EQ(to, std::set<uint64_t>({2, 3}));
     }
   }
+
+  // TestFollowerAppendEntries tests that when AppendEntries RPC is valid,
+  // the follower will delete the existing conflict entry and all that follow it,
+  // and append any new entries not already in the log.
+  // Also, it writes the new entry into stable storage.
+  // Reference: section 5.3
+  static void TestFollowerAppendEntries() {
+    // This test actually repeats Raft.HandleAppendEntries.
+
+    struct TestData {
+      uint64_t index, term;
+      EntryVec ents;
+
+      EntryVec wents;
+      EntryVec wunstable;
+    } tests[] = {
+        {2, 2, {pbEntry(3, 3)}, {pbEntry(1, 1), pbEntry(2, 2), pbEntry(3, 3)}, {pbEntry(3, 3)}},
+        {
+            1,
+            1,
+            {pbEntry(2, 3), pbEntry(3, 4)},
+            {pbEntry(1, 1), pbEntry(2, 3), pbEntry(3, 4)},
+            {pbEntry(2, 3), pbEntry(3, 4)},
+        },
+        {0, 0, {pbEntry(1, 1)}, {pbEntry(1, 1), pbEntry(2, 2)}},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(
+          newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage({pbEntry(1, 1), pbEntry(2, 2)})));
+      r->becomeFollower(2, 2);
+      r->Step(PBMessage()
+                  .From(2)
+                  .To(1)
+                  .Type(pb::MsgApp)
+                  .Term(2)
+                  .LogTerm(t.term)
+                  .Index(t.index)
+                  .Entries(t.ents)
+                  .v);
+
+      ASSERT_TRUE(r->log_->AllEntries() == t.wents);
+      ASSERT_TRUE(r->log_->TEST_Unstable().entries == t.wunstable);
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -310,4 +355,8 @@ TEST(Raft, LeaderOnlyCommitsLogFromCurrentTerm) {
 
 TEST(Raft, VoteRequest) {
   RaftPaperTest::TestVoteRequest();
+}
+
+TEST(Raft, FollowerAppendEntries) {
+  RaftPaperTest::TestFollowerAppendEntries();
 }
