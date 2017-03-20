@@ -60,7 +60,9 @@
 
 1. Assert(state == Candidate)
 2. Set `currentLeader` to itself.
-3. Reinitialize `nextIndex[]`, and `matchIndex[]`. 
+3. Reinitialize `nextIndex[]`, and `matchIndex[]`. In order to calculating the
+largest index of committed entry, leader's `matchIndex` should be maintained
+as well.
 
 ### Timer
 - heartbeat timer
@@ -119,8 +121,8 @@ Given a corner case: What if `commitIndex > prevLogIndex` ?
 - If an existing entry conflicts with a new one (same index but different terms), 
 delete the existing entry and all that follow it.
 - Append any new entries not already in the log.
-- NOTE: logs are first saved in `unstable`, until the library user flushing 
-them into storage.
+- NOTE: To append logs, they are first saved in `unstable`, until the library user flushing 
+them into stable storage.
 - NOTE: If MaybeAppend tries to append an array entries and all of which are existed, it will not
 delete the following log entries. The deleted should only follows an conflicted one.
 
@@ -132,7 +134,7 @@ delete the following log entries. The deleted should only follows an conflicted 
 
 #### Leader 
 
-@see `Raft::leaderHandleMsgProp` 
+@see `Raft::handleLeaderMsgProp` 
 
 When MsgProp is passed to leader, each of the log entries in message should be included with
 `term = leader's currentTerm` and `index = index of last entry + offset`.
@@ -148,6 +150,11 @@ Once leader receives a MsgAppResp,
 
 If there's only a single node in the cluster, whenever it receives a MsgHup, 
 it will immediately convert to Leader state.
+
+### Sending AppendEntries RPC
+
+Entries in an AppendEntries RPC are restricted with fixed size given by configuration,
+in order for flow control.
 
 ## Messages
 

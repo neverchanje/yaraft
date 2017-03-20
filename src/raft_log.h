@@ -191,6 +191,11 @@ class RaftLog {
     return false;
   }
 
+  StatusWith<EntryVec> Entries(uint64_t lo, uint64_t maxSize) {
+    uint64_t lastIdx = LastIndex();
+    return Entries(lo, lastIdx + 1, maxSize);
+  }
+
   // Returns a slice of log entries from lo through hi-1, inclusive.
   // FirstIndex <= lo < hi <= LastIndex + 1
   StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) {

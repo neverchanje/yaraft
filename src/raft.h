@@ -184,9 +184,12 @@ class Raft : public StateMachine {
     prs_.clear();
 
     for (uint64_t id : c_->peers) {
-      prs_[id] = Progress().NextIndex(log_->LastIndex() + 1);
+      prs_[id] = Progress().NextIndex(log_->LastIndex() + 1).MatchIndex(0);
     }
     prs_[id_].MatchIndex(log_->LastIndex());
+
+    // TODO: why?
+    appendRawEntries(PBMessage().Entries({PBEntry().Data(nullptr).v}).v);
 
     LOG(INFO) << id_ << " became leader at term " << currentTerm_;
   }
@@ -197,7 +200,7 @@ class Raft : public StateMachine {
         bcastHeartbeat();
         return;
       case pb::MsgProp:
-        leaderHandleMsgProp(m);
+        handleLeaderMsgProp(m);
         return;
       default:
         break;
@@ -379,10 +382,15 @@ class Raft : public StateMachine {
     m.To(to);
 
     uint64_t prevLogIndex = pr.NextIndex() - 1;
-    auto s = log_->Term(prevLogIndex);
+    auto sTerm = log_->Term(prevLogIndex);
 
-    if (s.OK()) {
-      uint64_t prevLogTerm = s.GetValue();
+    if (sTerm.OK()) {
+      uint64_t prevLogTerm = sTerm.GetValue();
+
+      auto sEnts = log_->Entries(pr.NextIndex(), c_->MaxSizePerMsg);
+      LOG_ASSERT(sEnts.OK());
+      m.Entries(sEnts.GetValue());
+
       m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm);
     } else {
     }
@@ -444,7 +452,12 @@ class Raft : public StateMachine {
     }
   }
 
-  void leaderHandleMsgProp(pb::Message& m) {
+  void handleLeaderMsgProp(pb::Message& m) {
+    appendRawEntries(m);
+    bcastAppend();
+  }
+
+  void appendRawEntries(pb::Message& m) {
     auto entries = m.mutable_entries();
     uint64_t li = log_->LastIndex(), i = 1;
     for (auto it = entries->begin(); it != entries->end(); it++) {
@@ -454,7 +467,7 @@ class Raft : public StateMachine {
     }
     log_->Append(m.mutable_entries()->begin(), m.mutable_entries()->end());
     prs_[id_].MaybeUpdate(log_->LastIndex());
-    bcastAppend();
+    advanceCommitIndex();
   }
 
   // advanceCommitIndex advances commitIndex to the largest index of log having
@@ -541,7 +554,7 @@ class Raft : public StateMachine {
   StateRole role_;
 
   uint64_t currentTerm_;
-  uint64_t votedFor_;  // who we voted for
+  uint64_t votedFor_;
 
   std::unordered_map<uint64_t, bool> voteGranted_;
 

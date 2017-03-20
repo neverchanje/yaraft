@@ -311,6 +311,65 @@ class RaftPaperTest {
       ASSERT_TRUE(r->log_->TEST_Unstable().entries == t.wunstable);
     }
   }
+
+  // TestLeaderCommitPrecedingEntries tests that when leader commits a log entry,
+  // it also commits all preceding entries in the leader’s log, including
+  // entries created by previous leaders.
+  // Also, it applies the entry to its local state machine (in log order).
+  // Reference: section 5.3
+  static void TestLeaderCommitPrecedingEntries() {
+    struct TestData {
+      EntryVec ents;
+    } tests[] = {
+        {}, {{pbEntry(1, 2)}}, {{pbEntry(1, 1), pbEntry(2, 2)}}, {{pbEntry(1, 1)}},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage(t.ents)));
+      r->loadState(PBHardState().Term(2).v);
+      r->becomeCandidate();
+      r->becomeLeader();
+
+      auto m = PBMessage()
+                   .From(1)
+                   .To(1)
+                   .Type(pb::MsgProp)
+                   .Term(r->currentTerm_)
+                   .Entries({PBEntry().Data("some data").v})
+                   .v;
+      r->Step(m);
+
+      auto apps = r->mails_;
+      r->mails_.clear();
+      for (auto msg : apps) {
+        auto resp = replyMsgApp(msg);
+        r->Step(resp);
+      }
+
+      uint64_t lastIdx = r->c_->storage->LastIndex().GetValue();
+      EntryVec expect = t.ents;
+      expect.push_back(
+          PBEntry().Term(3).Index(lastIdx + 1).v);  // empty log appended when leader elected
+      expect.push_back(PBEntry().Term(3).Index(lastIdx + 2).Data("some data").v);
+
+      EntryVec actual = t.ents;
+      EntryVec& unstable = r->log_->TEST_Unstable().entries;
+      std::copy(unstable.begin(), unstable.end(), std::back_inserter(actual));
+
+      std::cout << actual << expect;
+      ASSERT_TRUE(actual == expect);
+    }
+  }
+
+  static pb::Message replyMsgApp(pb::Message m) {
+    return PBMessage()
+        .From(m.to())
+        .To(m.from())
+        .Type(pb::MsgAppResp)
+        .Index(m.index() + m.entries_size())
+        .Term(m.term())
+        .v;
+  }
 };
 
 }  // namespace yaraft
@@ -359,4 +418,8 @@ TEST(Raft, VoteRequest) {
 
 TEST(Raft, FollowerAppendEntries) {
   RaftPaperTest::TestFollowerAppendEntries();
+}
+
+TEST(Raft, LeaderCommitPrecedingEntries) {
+  RaftPaperTest::TestLeaderCommitPrecedingEntries();
 }

@@ -84,7 +84,8 @@ class Progress {
   }
 
   // MaybeUpdate returns false if the given index comes from an outdated message.
-  // Otherwise it updates the progress and returns true.
+  // Otherwise it updates the progress (nextIndex and matchIndex) and returns true.
+  // Leader will advance commitIndex when the progress updated.
   bool MaybeUpdate(uint64_t index) {
     bool updated = false;
 

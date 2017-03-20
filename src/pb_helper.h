@@ -106,6 +106,11 @@ struct PBEntry {
     v.set_term(term);
     return *this;
   }
+
+  PBEntry& Data(const silly::Slice& data) {
+    v.set_data(data.RawData(), data.Len());
+    return *this;
+  }
 };
 
 struct PBSnapshot {
