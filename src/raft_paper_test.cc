@@ -405,6 +405,30 @@ class RaftPaperTest {
     }
   }
 
+  // TestCandidateFallback tests that while waiting for votes,
+  // if a candidate receives an AppendEntries RPC from another server claiming
+  // to be leader whose term is at least as large as the candidate's current term,
+  // it recognizes the leader as legitimate and returns to follower state.
+  // Reference: section 5.2
+  static void TestCandidateFallback() {
+    struct TestData {
+      uint64_t term;
+    } tests[] = {
+        1, 2,
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage()));
+      r->Step(PBMessage().From(1).To(1).Type(pb::MsgHup).v);
+      ASSERT_EQ(r->role_, Raft::kCandidate);
+      ASSERT_EQ(r->currentTerm_, 1);
+
+      r->Step(PBMessage().From(2).To(1).Term(t.term).Type(pb::MsgApp).v);
+      ASSERT_EQ(r->role_, Raft::kFollower);
+      ASSERT_EQ(r->currentTerm_, t.term);
+    }
+  }
+
   static pb::Message replyMsgApp(pb::Message m) {
     return PBMessage()
         .From(m.to())
@@ -477,4 +501,8 @@ TEST(Raft, LeaderCommitPrecedingEntries) {
 
 TEST(Raft, LeaderAcknowledgeCommit) {
   RaftPaperTest::TestLeaderAcknowledgeCommit();
+}
+
+TEST(Raft, CandidateFallback) {
+  RaftPaperTest::TestCandidateFallback();
 }

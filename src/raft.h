@@ -261,10 +261,17 @@ class Raft : public StateMachine {
     }
   }
 
-  void stepCandidate(const pb::Message& m) {
+  void stepCandidate(pb::Message& m) {
     switch (m.type()) {
       case pb::MsgVoteResp:
         handleMsgVoteResp(m);
+        break;
+      case pb::MsgApp:
+        // if a candidate receives an AppendEntries RPC from another server claiming
+        // to be leader whose term is at least as large as the candidate's current term,
+        // it recognizes the leader as legitimate and returns to follower state.
+        becomeFollower(m.term(), m.from());
+        handleAppendEntries(m);
         break;
     }
   }
