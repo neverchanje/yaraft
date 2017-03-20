@@ -429,6 +429,46 @@ class RaftPaperTest {
     }
   }
 
+  // TestLeaderStartReplication tests that when receiving client proposals,
+  // the leader appends the proposal to its log as a new entry, then issues
+  // AppendEntries RPCs in parallel to each of the other servers to replicate
+  // the entry. Also, when sending an AppendEntries RPC, the leader includes
+  // the index and term of the entry in its log that immediately precedes
+  // the new entries.
+  // Also, it writes the new entry into stable storage.
+  // Reference: section 5.3
+  static void TestLeaderStartReplication() {
+    RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage()));
+    r->becomeCandidate();
+    r->becomeLeader();
+    ASSERT_EQ(r->currentTerm_, 1);
+
+    // clean up noop entry generated when leader elected
+    r->mails_.clear();
+    r->log_->TEST_Unstable().entries.clear();
+
+    auto ents = {PBEntry().Data("some data").v};
+    uint64_t li = r->log_->LastIndex();
+    r->Step(PBMessage().From(1).To(1).Term(1).Type(pb::MsgProp).Entries(ents).v);
+    ASSERT_EQ(r->log_->LastIndex(), li + 1);
+    ASSERT_EQ(r->log_->CommitIndex(), li);
+
+    auto wents = {PBEntry().Term(1).Index(li + 1).Data("some data").v};
+    ASSERT_TRUE(r->log_->TEST_Unstable().entries == wents);
+
+    std::unordered_set<std::string> s1;
+    std::for_each(r->mails_.begin(), r->mails_.end(),
+                  [&](const pb::Message& m) { s1.insert(DumpPB(m)); });
+
+    auto msg =
+        PBMessage().Index(li).LogTerm(0).From(1).Type(pb::MsgApp).Entries(wents).Term(1).Commit(li);
+    std::unordered_set<std::string> s2;
+    s2.insert(DumpPB(msg.To(2).v));
+    s2.insert(DumpPB(msg.To(3).v));
+
+    ASSERT_EQ(s1, s2);
+  }
+
   static pb::Message replyMsgApp(pb::Message m) {
     return PBMessage()
         .From(m.to())
@@ -505,4 +545,8 @@ TEST(Raft, LeaderAcknowledgeCommit) {
 
 TEST(Raft, CandidateFallback) {
   RaftPaperTest::TestCandidateFallback();
+}
+
+TEST(Raft, LeaderStartReplication) {
+  RaftPaperTest::TestLeaderStartReplication();
 }

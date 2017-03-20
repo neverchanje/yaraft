@@ -398,7 +398,7 @@ class Raft : public StateMachine {
       LOG_ASSERT(sEnts.OK());
       m.Entries(sEnts.GetValue());
 
-      m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm);
+      m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm).Commit(log_->CommitIndex());
     } else {
     }
     send(m.v);
