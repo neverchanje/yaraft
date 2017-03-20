@@ -361,6 +361,50 @@ class RaftPaperTest {
     }
   }
 
+  // TestLeaderAcknowledgeCommit tests that a log entry is committed once the
+  // leader that created the entry has replicated it on a majority of the servers.
+  // Reference: section 5.3
+  static void TestLeaderAcknowledgeCommit() {
+    struct TestData {
+      size_t size;
+      std::set<uint64_t> acceptors;
+
+      bool wack;
+    } tests[] = {
+        {1, {}, true},     {3, {}, false},       {3, {2}, true},
+        {3, {2, 3}, true}, {5, {}, false},       {5, {2}, false},
+        {5, {2, 3}, true}, {5, {2, 3, 4}, true}, {5, {2, 3, 4, 5}, true},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, idsBySize(t.size), 10, 1, new MemoryStorage()));
+      r->becomeCandidate();
+      r->becomeLeader();
+      r->mails_.clear();
+
+      r->Step(PBMessage()
+                  .From(1)
+                  .To(1)
+                  .Type(pb::MsgProp)
+                  .Term(r->currentTerm_)
+                  .Entries({PBEntry().Data("some data").v})
+                  .v);
+      auto apps = r->mails_;
+      r->mails_.clear();
+
+      for (auto& m : apps) {
+        if (t.acceptors.find(m.to()) != t.acceptors.end()) {
+          auto resp = replyMsgApp(m);
+          r->Step(resp);
+        }
+      }
+
+      uint64_t li = r->log_->LastIndex();
+      bool ack = (r->log_->CommitIndex() >= 1);
+      ASSERT_EQ(ack, t.wack);
+    }
+  }
+
   static pb::Message replyMsgApp(pb::Message m) {
     return PBMessage()
         .From(m.to())
@@ -369,6 +413,13 @@ class RaftPaperTest {
         .Index(m.index() + m.entries_size())
         .Term(m.term())
         .v;
+  }
+
+  static std::vector<uint64_t> idsBySize(size_t size) {
+    std::vector<uint64_t> ids(size);
+    int n = 1;
+    std::generate(ids.begin(), ids.end(), [&n] { return n++; });
+    return ids;
   }
 };
 
@@ -422,4 +473,8 @@ TEST(Raft, FollowerAppendEntries) {
 
 TEST(Raft, LeaderCommitPrecedingEntries) {
   RaftPaperTest::TestLeaderCommitPrecedingEntries();
+}
+
+TEST(Raft, LeaderAcknowledgeCommit) {
+  RaftPaperTest::TestLeaderAcknowledgeCommit();
 }

@@ -387,7 +387,7 @@ class Raft : public StateMachine {
     if (sTerm.OK()) {
       uint64_t prevLogTerm = sTerm.GetValue();
 
-      auto sEnts = log_->Entries(pr.NextIndex(), c_->MaxSizePerMsg);
+      auto sEnts = log_->Entries(pr.NextIndex(), c_->maxSizePerMsg);
       LOG_ASSERT(sEnts.OK());
       m.Entries(sEnts.GetValue());
 

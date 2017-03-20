@@ -52,12 +52,12 @@ class Config {
   // out of storage when restarting.
   Storage* storage;
 
-  // MaxSizePerMsg limits the max size of each append message. Smaller value
+  // maxSizePerMsg limits the max size of each append message. Smaller value
   // lowers the raft recovery cost(initial probing and message lost during normal
   // operation). On the other side, it might affect the throughput during normal
   // replication. Note: math.MaxUint64 for unlimited, 0 for at most one entry per
   // message.
-  uint64_t MaxSizePerMsg;
+  uint64_t maxSizePerMsg;
 
   // peers contains the IDs of all nodes (including self) in the raft cluster. It
   // should only be set when starting a new raft cluster. Restarting raft from

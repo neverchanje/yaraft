@@ -32,6 +32,7 @@ Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, in
   conf->heartbeatTick = heartbeat;
   conf->storage = storage;
   conf->peers = std::move(peers);
+  conf->maxSizePerMsg = std::numeric_limits<uint64_t>::max();
   return conf;
 }
 

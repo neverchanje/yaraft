@@ -115,7 +115,7 @@ class Progress {
 
   // inflights is a sliding window for the inflight messages.
   // Each inflight message contains one or more log entries.
-  // The max number of entries per message is defined in raft config as MaxSizePerMsg.
+  // The max number of entries per message is defined in raft config as maxSizePerMsg.
   // Thus inflight effectively limits both the number of inflight messages
   // and the bandwidth each Progress can use.
   // When inflights is full, no more message should be sent.
