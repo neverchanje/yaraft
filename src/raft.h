@@ -146,11 +146,7 @@ class Raft : public StateMachine {
     role_ = kCandidate;
     LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
 
-    // vote for itself
     votedFor_ = id_;
-    voteGranted_[id_] = true;
-    LOG(INFO) << fmt::format("{:x} received MsgVoteResp from {:x} at term {:d}", id_, id_,
-                             currentTerm_);
 
     currentTerm_++;
     electionElapsed_ = 0;
@@ -255,6 +251,7 @@ class Raft : public StateMachine {
       return;
     }
 
+    // return to follower state if it receives vote denial from a majority
     int rejected = static_cast<int>(voteGranted_.size()) - gr;
     if (rejected >= quorum()) {
       becomeFollower(m.term(), 0);
@@ -507,6 +504,9 @@ class Raft : public StateMachine {
   void campaign(CampaignType type) {
     DLOG_ASSERT(type == kCampaignElection);
     becomeCandidate();
+
+    // vote for itself
+    Step(PBMessage().From(1).To(1).Term(currentTerm_).Type(pb::MsgVoteResp).v);
 
     auto m = PBMessage()
                  .Term(currentTerm_)

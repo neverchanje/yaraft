@@ -478,7 +478,7 @@ class RaftPaperTest {
   // Reference: section 5.3
   static void TestLeaderCommitEntry() {
     int heartbeatTimeout = 3;
-    RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 3, new MemoryStorage()));
+    RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, heartbeatTimeout, new MemoryStorage()));
     r->becomeCandidate();
     r->becomeLeader();
 
@@ -546,6 +546,64 @@ class RaftPaperTest {
       ASSERT_EQ(resp.to(), 2);
       ASSERT_EQ(resp.reject(), t.wreject);
       ASSERT_EQ(resp.term(), 2);
+    }
+  }
+
+  // TestLeaderElectionInOneRoundRPC tests all cases that may happen in
+  // leader election during one round of RequestVote RPC:
+  // a) it wins the election
+  // b) another server establishes itself as leader
+  // c) a period of time goes by with no winner
+  // Reference: section 5.2
+  static void TestLeaderElectionInOneRoundRPC() {
+    struct TestData {
+      size_t size;
+      std::set<uint64_t> acceptors;
+      std::set<uint64_t> rejected;
+
+      Raft::StateRole wstate;
+    } tests[] = {
+        // win the election when receiving votes from a majority of the servers
+        {1, {}, {}, Raft::kLeader},
+        {3, {2, 3}, {}, Raft::kLeader},
+        {3, {2}, {}, Raft::kLeader},
+        {5, {2, 3, 4, 5}, {}, Raft::kLeader},
+        {5, {2, 3, 4}, {}, Raft::kLeader},
+        {5, {2, 3}, {}, Raft::kLeader},
+
+        // return to follower state if it receives vote denial from a majority
+        {3, {}, {2, 3}, Raft::kFollower},
+        {5, {}, {2, 3, 4, 5}, Raft::kFollower},
+        {5, {2}, {3, 4, 5}, Raft::kFollower},
+
+        // stay in candidate if it does not obtain the majority
+        {3, {}, {}, Raft::kCandidate},
+        {5, {2}, {}, Raft::kCandidate},
+        {5, {}, {2, 3}, Raft::kCandidate},
+        {5, {}, {}, Raft::kCandidate},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, idsBySize(t.size), 10, 1, new MemoryStorage()));
+
+      r->Step(PBMessage().From(1).To(1).Term(r->currentTerm_).Type(pb::MsgHup).v);
+      ASSERT_EQ(r->currentTerm_, 1);
+
+      for (uint64_t id = 2; id <= t.size; id++) {
+        auto m = PBMessage().From(id).To(1).Type(pb::MsgVoteResp).Term(r->currentTerm_);
+
+        bool accept = (t.acceptors.find(id) != t.acceptors.end());
+        if (accept) {
+          r->Step(m.v);
+        }
+
+        bool reject = (t.rejected.find(id) != t.rejected.end());
+        if (reject) {
+          r->Step(m.Reject(true).v);
+        }
+      }
+
+      ASSERT_EQ(r->role_, t.wstate);
     }
   }
 
@@ -637,4 +695,8 @@ TEST(Raft, LeaderCommitEntry) {
 
 TEST(Raft, FollowerCheckMsgApp) {
   RaftPaperTest::TestFollowerCheckMsgApp();
+}
+
+TEST(Raft, LeaderElectionInOneRoundRPC) {
+  RaftPaperTest::TestLeaderElectionInOneRoundRPC();
 }
