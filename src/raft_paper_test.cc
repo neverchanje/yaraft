@@ -469,6 +469,47 @@ class RaftPaperTest {
     ASSERT_EQ(s1, s2);
   }
 
+  // TestLeaderCommitEntry tests that when the entry has been safely replicated,
+  // the leader gives out the applied entries, which can be applied to its state
+  // machine.
+  // Also, the leader keeps track of the highest index it knows to be committed,
+  // and it includes that index in future AppendEntries RPCs so that the other
+  // servers eventually find out.
+  // Reference: section 5.3
+  static void TestLeaderCommitEntry() {
+    int heartbeatTimeout = 3;
+    RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 3, new MemoryStorage()));
+    r->becomeCandidate();
+    r->becomeLeader();
+
+    // clean up noop entry generated when leader elected
+    r->mails_.clear();
+    r->log_->TEST_Unstable().entries.clear();
+
+    uint64_t li = r->log_->LastIndex();
+    auto ents = {PBEntry().Data("some data").v};
+    r->Step(PBMessage().From(1).To(1).Term(1).Type(pb::MsgProp).Entries(ents).v);
+
+    auto apps = r->mails_;
+    r->mails_.clear();
+    for (auto& m : apps) {
+      auto resp = replyMsgApp(m);
+      r->Step(resp);
+    }
+
+    ASSERT_EQ(r->log_->CommitIndex(), li + 1);
+
+    for (int i = 0; i < heartbeatTimeout; i++) {
+      r->_tick();
+    }
+
+    ASSERT_EQ(r->mails_.size(), 2);
+    for (auto m : r->mails_) {
+      ASSERT_EQ(m.type(), pb::MsgHeartbeat);
+      ASSERT_EQ(m.commit(), li + 1);
+    }
+  }
+
   static pb::Message replyMsgApp(pb::Message m) {
     return PBMessage()
         .From(m.to())
@@ -549,4 +590,8 @@ TEST(Raft, CandidateFallback) {
 
 TEST(Raft, LeaderStartReplication) {
   RaftPaperTest::TestLeaderStartReplication();
+}
+
+TEST(Raft, LeaderCommitEntry) {
+  RaftPaperTest::TestLeaderCommitEntry();
 }
