@@ -75,22 +75,6 @@ class Raft : public StateMachine {
         log_->LastTerm());
   }
 
-  void handleMsgVote(const pb::Message& m) {
-    if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
-      // - If we haven't voted for any candidates, or
-      // - if we have voted for the same peer (repeated votes for a same candidate is allowed),
-      // - and for all conditions above, the candidate's log must be at least as up-to-date as
-      // the voter's (raft thesis 3.6).
-
-      // then we can grant the vote.
-      sendVoteResp(m, false);
-      electionElapsed_ = 0;
-      votedFor_ = m.from();
-    } else {
-      sendVoteResp(m, true);
-    }
-  }
-
   virtual Status Step(pb::Message& m) override {
     if (currentTerm_ > m.term()) {
       // ignore the message
@@ -232,6 +216,22 @@ class Raft : public StateMachine {
       gr += e.second;
     }
     return gr;
+  }
+
+  void handleMsgVote(const pb::Message& m) {
+    if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
+      // - If we haven't voted for any candidates, or
+      // - if we have voted for the same peer (repeated votes for a same candidate is allowed),
+      // - and for all conditions above, the candidate's log must be at least as up-to-date as
+      // the voter's (raft thesis 3.6).
+
+      // then we can grant the vote.
+      sendVoteResp(m, false);
+      electionElapsed_ = 0;
+      votedFor_ = m.from();
+    } else {
+      sendVoteResp(m, true);
+    }
   }
 
   void handleMsgVoteResp(const pb::Message& m) {
