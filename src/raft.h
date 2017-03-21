@@ -279,8 +279,11 @@ class Raft : public StateMachine {
   void stepFollower(pb::Message& m) {
     switch (m.type()) {
       case pb::MsgApp:
-        electionElapsed_ = 0;
-        currentLeader_ = m.from();
+        if (m.from() != currentLeader_) {
+          LOG(INFO) << fmt::format("[{}, follower]: Change leader to {} at {}", id_, m.from(),
+                                   m.term());
+          currentLeader_ = m.from();
+        }
         handleAppendEntries(m);
         break;
     }

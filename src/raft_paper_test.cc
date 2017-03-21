@@ -510,6 +510,45 @@ class RaftPaperTest {
     }
   }
 
+  // TestFollowerCheckMsgApp tests that if the follower does not find an
+  // entry in its log with the same index and term as the one in AppendEntries RPC,
+  // then it refuses the new entries. Otherwise it replies that it accepts the
+  // append entries.
+  // Reference: section 5.3
+  static void TestFollowerCheckMsgApp() {
+    struct TestData {
+      uint64_t prevLogTerm;
+      uint64_t prevLogIndex;
+
+      bool wreject;
+    } tests[] = {
+        {0, 0, false}, {1, 1, false}, {2, 2, false}, {1, 2, true}, {3, 3, true},
+    };
+
+    for (auto t : tests) {
+      RaftUPtr r(
+          newTestRaft(1, {1, 2, 3}, 10, 3, new MemoryStorage({pbEntry(1, 1), pbEntry(2, 2)})));
+      r->becomeFollower(2, 2);
+      r->Step(PBMessage()
+                  .Type(pb::MsgApp)
+                  .Index(t.prevLogIndex)
+                  .LogTerm(t.prevLogTerm)
+                  .Term(2)
+                  .From(2)
+                  .To(1)
+                  .v);
+
+      ASSERT_EQ(r->mails_.size(), 1);
+
+      auto resp = r->mails_[0];
+      ASSERT_EQ(resp.type(), pb::MsgAppResp);
+      ASSERT_EQ(resp.from(), 1);
+      ASSERT_EQ(resp.to(), 2);
+      ASSERT_EQ(resp.reject(), t.wreject);
+      ASSERT_EQ(resp.term(), 2);
+    }
+  }
+
   static pb::Message replyMsgApp(pb::Message m) {
     return PBMessage()
         .From(m.to())
@@ -594,4 +633,8 @@ TEST(Raft, LeaderStartReplication) {
 
 TEST(Raft, LeaderCommitEntry) {
   RaftPaperTest::TestLeaderCommitEntry();
+}
+
+TEST(Raft, FollowerCheckMsgApp) {
+  RaftPaperTest::TestFollowerCheckMsgApp();
 }
