@@ -46,6 +46,7 @@ struct Network {
     for (auto r : prs) {
       peers_[r->Id()] = r;
     }
+    size_ = prs.size();
   }
 
   ~Network() {
@@ -54,14 +55,16 @@ struct Network {
     }
   }
 
-  void Send(pb::Message& m) {
+  void Send(pb::Message m) {
     uint64_t to = m.to(), from = m.from();
-    if (!peers_[to]) {
+
+    if (peers_.find(to) == peers_.end()) {
       return;
     }
 
     if (m.type() != pb::MsgVote) {
-      m.set_term(peers_[from]->currentTerm_);
+      if (peers_.find(from) != peers_.end())
+        m.set_term(peers_[from]->currentTerm_);
     }
 
     peers_[to]->Step(m);
@@ -91,10 +94,36 @@ struct Network {
     return boost::none;
   }
 
+  void RaiseElection(uint64_t cand = 1) {
+    Send(PBMessage().From(cand).To(cand).Type(pb::MsgHup).v);
+
+    // Broadcast request votes to peers
+    for (uint64_t id = 1; id <= PeerSize(); id++) {
+      if (id == cand)
+        continue;
+      if (peers_.find(id) != peers_.end()) {
+        auto vote = MustTake(cand, id, pb::MsgVote);
+        Send(vote);
+      }
+    }
+
+    // Receive vote responses
+    for (uint64_t id = 1; id <= PeerSize(); id++) {
+      if (id == cand)
+        continue;
+      if (peers_.find(id) != peers_.end()) {
+        auto voteResp = MustTake(id, cand, pb::MsgVoteResp);
+        Send(voteResp);
+      }
+    }
+  }
+
   pb::Message MustTake(uint64_t from, uint64_t to, pb::MessageType type) {
     auto m = Take(from, to);
-    DLOG_ASSERT(bool(m));
-    DLOG_ASSERT(m->type() == type);
+    auto err = fmt::format(" Message [from: {}, to: {}, type: {}] not exists ", from, to,
+                           pb::MessageType_Name(type));
+    DLOG_ASSERT(bool(m)) << err;
+    DLOG_ASSERT(m->type() == type) << err;
     return *m;
   }
 
@@ -119,25 +148,26 @@ struct Network {
   }
 
   uint64_t PeerSize() const {
-    return peers_.size();
+    return size_;
   }
 
-  Network* Set(Config* conf) {
-    if (peers_.find(conf->id) != peers_.end()) {
-      delete peers_[conf->id];
+  Network* Set(Raft* r) {
+    if (peers_.find(r->Id()) != peers_.end()) {
+      delete peers_[r->Id()];
     }
-    peers_[conf->id] = new Raft(conf);
+    peers_[r->Id()] = r;
     return this;
   }
 
   Network* Down(uint64_t id) {
     delete peers_[id];
-    peers_[id] = nullptr;
+    peers_.erase(peers_.find(id));
     return this;
   }
 
  private:
   std::unordered_map<uint64_t, Raft*> peers_;
+  size_t size_;
 
   // to => Message
   std::unordered_map<uint64_t, std::list<pb::Message>> mailTo_;

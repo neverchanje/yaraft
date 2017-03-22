@@ -126,7 +126,7 @@ class RaftTest {
     };
 
     for (auto t : tests) {
-      auto raft = newTestRaft(1, {1}, 10, 1, new MemoryStorage());
+      RaftUPtr raft(newTestRaft(1, {1}, 10, 1, new MemoryStorage()));
       raft->role_ = t.from;
 
       bool failed = false;
@@ -183,8 +183,8 @@ class RaftTest {
 
   // TestHandleHeartbeatResp ensures that we re-send log entries when we get a heartbeat response.
   static void TestHandleHeartbeatResp() {
-    auto raft = newTestRaft(1, {1, 2}, 10, 1,
-                            new MemoryStorage(pbEntry(1, 1) + pbEntry(2, 2) + pbEntry(3, 3)));
+    RaftUPtr raft(newTestRaft(1, {1, 2}, 10, 1,
+                              new MemoryStorage(pbEntry(1, 1) + pbEntry(2, 2) + pbEntry(3, 3))));
     raft->becomeCandidate();
     raft->becomeLeader();
 
@@ -211,28 +211,6 @@ class RaftTest {
     ASSERT_EQ(raft->mails_.size(), 0);
   }
 
-  static void RaiseElection(Network* n, uint64_t cand = 1) {
-    n->Send(PBMessage().From(cand).To(cand).Type(pb::MsgHup).v);
-
-    // Broadcast request votes to peers
-    for (uint64_t id = 1; id <= n->PeerSize(); id++) {
-      if (id == cand)
-        continue;
-      auto vote = n->MustTake(cand, id, pb::MsgVote);
-      n->Send(vote);
-    }
-
-    // Receive vote responses
-    for (uint64_t id = 1; id <= n->PeerSize(); id++) {
-      if (id == cand)
-        continue;
-      if (n->Peer(id)) {
-        auto voteResp = n->MustTake(id, 1, pb::MsgVoteResp);
-        n->Send(voteResp);
-      }
-    }
-  }
-
   static void TestLeaderElection() {
     struct TestData {
       Network* network;
@@ -257,11 +235,12 @@ class RaftTest {
     };
 
     for (auto t : tests) {
-      RaiseElection(t.network);
+      t.network->RaiseElection(1);
 
       auto node = t.network->Peer(1);
       ASSERT_EQ(node->role_, t.role);
       ASSERT_EQ(node->currentTerm_, t.wterm);
+      delete t.network;
     }
   }
 
@@ -270,13 +249,14 @@ class RaftTest {
   // pre-vote) work when not starting from a clean slate (as they do in
   // TestLeaderElection)
   static void TestLeaderCycle() {
-    Network* n = Network::New(4);
     for (uint64_t cand = 1; cand <= 3; cand++) {
-      RaiseElection(n, cand);
+      Network* n = Network::New(3);
+      n->RaiseElection(cand);
 
       for (uint64_t id = 1; id <= 3; id++) {
         ASSERT_EQ(n->Peer(id)->role_, cand == id ? Raft::kLeader : Raft::kFollower);
       }
+      delete n;
     }
   }
 
