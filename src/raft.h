@@ -276,11 +276,7 @@ class Raft : public StateMachine {
   void stepFollower(pb::Message& m) {
     switch (m.type()) {
       case pb::MsgApp:
-        if (m.from() != currentLeader_) {
-          LOG(INFO) << fmt::format("[{}, follower]: Change leader to {} at {}", id_, m.from(),
-                                   m.term());
-          currentLeader_ = m.from();
-        }
+        currentLeader_ = m.from();
         handleAppendEntries(m);
         break;
     }
@@ -424,12 +420,13 @@ class Raft : public StateMachine {
   void handleMsgAppResp(const pb::Message& m) {
     auto& pr = prs_[m.from()];
     if (m.reject()) {
-      DLOG(INFO) << fmt::format("%x received msgApp rejection(lastindex: %d) from %x for index %d",
-                                id_, m.rejecthint(), m.from(), m.index());
+      DLOG(INFO) << fmt::format(
+          "{:x} received msgApp rejection(lastindex: {:d}) from {:x} for index {:d}", id_,
+          m.rejecthint(), m.from(), m.index());
 
       if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
         // retry with a smaller index
-        DLOG(INFO) << fmt::format("%x decreased progress of %x to [%s]", id_, m.from(),
+        DLOG(INFO) << fmt::format("{:x} decreased progress of {:x} to [{:s}]", id_, m.from(),
                                   pr.ToString());
         sendAppend(m.from());
       }
@@ -442,9 +439,6 @@ class Raft : public StateMachine {
 
   void handleAppendEntries(pb::Message& m) {
     DLOG_ASSERT(role_ == StateRole::kFollower);
-
-    uint64_t prevLogIndex = m.index();
-    uint64_t prevLogTerm = m.logterm();
 
     PBMessage msg;
     msg.To(m.from()).Type(pb::MsgAppResp);

@@ -607,6 +607,70 @@ class RaftPaperTest {
     }
   }
 
+  // TestLeaderSyncFollowerLog tests that the leader could bring a follower's log
+  // into consistency with its own.
+  // Reference: section 5.3, figure 7
+  static void TestLeaderSyncFollowerLog() {
+    struct TestData {
+      EntryVec ents;
+    } tests[] = {
+        {{pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4), pbEntry(5, 4), pbEntry(6, 5),
+          pbEntry(7, 5), pbEntry(8, 6), pbEntry(9, 6)}},
+
+        {{pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4)}},
+
+        {{pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4), pbEntry(5, 4), pbEntry(6, 5),
+          pbEntry(7, 5), pbEntry(8, 6), pbEntry(9, 6), pbEntry(10, 6), pbEntry(11, 6)}},
+
+        {{pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4), pbEntry(5, 4), pbEntry(6, 5),
+          pbEntry(7, 5), pbEntry(8, 6), pbEntry(9, 6), pbEntry(10, 6), pbEntry(11, 7),
+          pbEntry(12, 7)}},
+
+        {{pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4), pbEntry(5, 4), pbEntry(6, 4),
+          pbEntry(7, 4)}},
+
+        {{pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 2), pbEntry(5, 2), pbEntry(6, 2),
+          pbEntry(7, 3), pbEntry(8, 3), pbEntry(9, 3), pbEntry(10, 3), pbEntry(11, 3)}},
+    };
+
+    for (auto t : tests) {
+      auto lead = newTestRaft(
+          1, {1, 2, 3}, 10, 1,
+          new MemoryStorage({
+              pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4), pbEntry(5, 4),
+              pbEntry(6, 5), pbEntry(7, 5), pbEntry(8, 6), pbEntry(9, 6), pbEntry(10, 6),
+          }));
+      lead->loadState(PBHardState().Term(8).v);
+
+      auto follower = newTestRaft(2, {1, 2, 3}, 10, 1, new MemoryStorage(t.ents));
+      follower->loadState(PBHardState().Term(7).v);
+
+      std::unique_ptr<Network> net(Network::New(3)->Down(3)->Set(lead)->Set(follower));
+
+      // Elect 1 as leader.
+      net->Send(PBMessage().From(1).To(1).Type(pb::MsgHup).v);
+      net->Send(net->MustTake(1, 2, pb::MsgVote));
+      net->Send(net->MustTake(1, 3, pb::MsgVote));
+      net->Send(net->MustTake(2, 1, pb::MsgVoteResp));
+      net->Send(PBMessage().From(3).To(1).Type(pb::MsgVoteResp).Term(9).v);
+
+      while (true) {
+        // retry if app rejected
+        auto m = net->MustTake(1, 2, pb::MsgApp);
+        net->Send(m);
+        m = net->MustTake(2, 1, pb::MsgAppResp);
+        net->Send(m);
+        if (!m.reject()) {
+          break;
+        }
+      }
+
+      auto followerEnts = follower->log_->Entries(follower->log_->FirstIndex(), noLimit);
+      auto leadEnts = lead->log_->Entries(lead->log_->FirstIndex(), noLimit);
+      ASSERT_TRUE(followerEnts.GetValue() == leadEnts.GetValue());
+    }
+  }
+
   static pb::Message replyMsgApp(pb::Message m) {
     return PBMessage()
         .From(m.to())
@@ -699,4 +763,8 @@ TEST(Raft, FollowerCheckMsgApp) {
 
 TEST(Raft, LeaderElectionInOneRoundRPC) {
   RaftPaperTest::TestLeaderElectionInOneRoundRPC();
+}
+
+TEST(Raft, LeaderSyncFollowerLog) {
+  RaftPaperTest::TestLeaderSyncFollowerLog();
 }
