@@ -8,9 +8,7 @@ the comments present in the code.
 |Any|Any message with term < `currentTerm`|Ignore this message|
 |Any|Any message contains term T > `currentTerm`|Set `currentTerm` = T, then process this message as normal.|
 |Any|MsgVote|[Handle RequestVote](#handle-requestvote)|
-|Leader|MsgBeat|Broadcast heartbeat messges to all peers.|
-|Leader|Rejected MsgApp (MsgAppResp with rejection)|Decrease `nextIndex` and retry.|
-|Leader|Committed MsgApp (OK MsgAppResp)|Update `matchIndex` to MsgAppResp.Index `n` if `matchIndex` < `n`. Update `nextIndex` to `n+1` if `nextIndex` < `n+1`. If matchIndex were updated, |
+|Leader|MsgAppResp|[Handle MsgAppResp](#handle-msgappresp)|
 |Leader|MsgHeartbeatResp|Resend AppendEntries when the follower was detected falling behind.|
 |Leader|MsgVoteResp|[Handle MsgVoteResp](#handle-requestvote-response)|
 |Leader|MsgProp|Handle MsgProp|
@@ -86,8 +84,6 @@ and either if we have voted for the same candidate, or we haven't voted for any 
 
 @see `Raft::handleMsgVoteResp`
 
-RequestVote responses (MsgVoteResp) are received sequentially.
-
 Once the number of granted MsgVoteResps the candidate has received grows to quorum of
 the cluster (`len(peers)/2+1`), it'll convert to leader and broadcast AppendEntries to other
 servers. Likewise, when the number of rejected votes grows to quorum, candidate will immediately
@@ -96,15 +92,15 @@ step down to follower.
 Consider a problem: how does the rejected candidate know who is the leader? Actually it doesn't
 know anything about leader.
 
-It's easy to see, after the candidate elected, it still receives MsgVoteResp. 
-But the new leader just ignore them.
+It's obvious that after the candidate elected, it still receives MsgVoteResp. 
+But the new leader just ignore them (leader doesn't handle MsgVoteResp).
 
 ### Handle AppendEntries
 
 @see `Raft::handleAppendEntries`
 
 - Assert(state == Follower)
-- Reply false if log doesn’t contain an entry at `prevLogIndex` whose term matches `prevLogTerm`. 
+- Reject if log doesn’t contain an entry at `prevLogIndex` whose term matches `prevLogTerm`. 
 - If `leaderCommit > commitIndex`, set `commitIndex = min(leaderCommit, index of last new entry)`.
 More specifically:
 ```c
@@ -124,7 +120,7 @@ Given a corner case: What if `commitIndex > prevLogIndex` ?
 - If an existing entry conflicts with a new one (same index but different terms), 
 delete the existing entry and all that follow it.
 - Append any new entries not already in the log.
-- NOTE: To append logs, they are first saved in `unstable`, until the library user flushing 
+- NOTE: Logs are first saved in `unstable` when being appended, until the library user flushing 
 them into stable storage.
 - NOTE: If MaybeAppend tries to append an array entries and all of which are existed, it will not
 delete the following log entries. The deleted should only follows an conflicted one.
@@ -148,6 +144,11 @@ After that leader will update `MatchIndex[]`, `NextIndex[]`, and broadcast Appen
 ### Handle MsgAppResp
 
 @see `Raft::handleMsgAppResp`
+
+- Leader advances `nextIndex` and `matchIndex` if MsgApp was accepted.
+- If more than half number of nodes have accepted the MsgApp, leader attempts to advance
+commitIndex to the largest index of log having replicated on majority (use `matchIndex`).
+- If MsgApp was rejected, leader decreases the `nextIndex` of that peer and retry.
 
 ### Single-Node Cluster
 
