@@ -1,3 +1,6 @@
+This file contains additional notes for yaraft, which supplement
+the comments present in the code.
+
 ## Internal Raft State Machine
 
 | Role | Message | Action |
@@ -88,7 +91,7 @@ RequestVote responses (MsgVoteResp) are received sequentially.
 Once the number of granted MsgVoteResps the candidate has received grows to quorum of
 the cluster (`len(peers)/2+1`), it'll convert to leader and broadcast AppendEntries to other
 servers. Likewise, when the number of rejected votes grows to quorum, candidate will immediately
-convert to follower.
+step down to follower.
 
 Consider a problem: how does the rejected candidate know who is the leader? Actually it doesn't
 know anything about leader.
@@ -144,17 +147,22 @@ After that leader will update `MatchIndex[]`, `NextIndex[]`, and broadcast Appen
 
 ### Handle MsgAppResp
 
-Once leader receives a MsgAppResp, 
+@see `Raft::handleMsgAppResp`
 
 ### Single-Node Cluster
 
-If there's only a single node in the cluster, whenever it receives a MsgHup, 
+If there's only single node in the cluster, whenever it receives a MsgHup, 
 it will immediately convert to Leader state.
 
 ### Sending AppendEntries RPC
 
-Entries in an AppendEntries RPC are restricted with fixed size given by configuration,
+Entries in an AppendEntries RPC are limited with maximum size given by configuration
+(`Conf::maxSizePerMsg`),
 in order for flow control.
+
+To preserve the AppendEntries consistency, each of the MsgApp message should carry with
+two arguments `prevLogIndex`, which = `nextIndex - 1`, and `prevLogTerm`, which is the term
+of entry at `prevLogIndex`.
 
 ## Messages
 
@@ -165,4 +173,3 @@ in order for flow control.
 |Reject|True if the AppendEntries failed.|
 |RejectHint|Returns index of the last log entry. Empty if the AppendEntries is accepted.|
 |Index|If rejected, returns prevLogIndex, otherwise returns index of the last entry.|
-|Term||
