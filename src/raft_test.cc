@@ -303,6 +303,19 @@ class RaftTest {
       ASSERT_EQ(r->log_->CommitIndex(), t.wcommit);
     }
   }
+
+  // TestCampaignWhileLeader ensures that a leader node won't step down
+  // when it elects itself.
+  static void TestCampaignWhileLeader() {
+    RaftUPtr r(newTestRaft(1, {1}, 5, 1, new MemoryStorage()));
+    ASSERT_EQ(r->role_, Raft::kFollower);
+
+    r->Step(PBMessage().From(1).To(1).Type(pb::MsgHup).Term(1).v);
+    ASSERT_EQ(r->role_, Raft::kLeader);
+
+    r->Step(PBMessage().From(1).To(1).Type(pb::MsgHup).Term(1).v);
+    ASSERT_EQ(r->role_, Raft::kLeader);
+  }
 };
 
 }  // namespace yaraft
@@ -339,4 +352,8 @@ TEST(Raft, LeaderCycle) {
 
 TEST(Raft, Commit) {
   yaraft::RaftTest::TestCommit();
+}
+
+TEST(Raft, CampaignWhileLeader) {
+  yaraft::RaftTest::TestCampaignWhileLeader();
 }
