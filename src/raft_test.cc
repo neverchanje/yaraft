@@ -141,6 +141,8 @@ class RaftTest {
           case Raft::kLeader:
             raft->becomeLeader();
             break;
+          default:
+            break;
         }
       } catch (RaftError& e) {
         failed = true;
@@ -343,6 +345,38 @@ class RaftTest {
     ASSERT_EQ(n->Peer(1)->role_, Raft::kFollower);
     ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
   }
+
+  // TestVoteFromAnyState ensures that no matter what state a node is from,
+  // it will always step down and vote for a legal candidate.
+  static void TestVoteFromAnyState() {
+    for (int i = 0; i < Raft::kStateNum; i++) {
+      auto role = Raft::StateRole(i);
+      RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage()));
+
+      if (role == Raft::kFollower) {
+        r->becomeFollower(1, 3);
+      } else if (role == Raft::kCandidate) {
+        r->becomeCandidate();
+      } else if (role == Raft::kLeader) {
+        r->becomeCandidate();
+        r->becomeLeader();
+      } else {
+      }
+      ASSERT_EQ(r->Term(), 1);
+
+      uint64_t newTerm = 2;
+      uint64_t from = 2;
+      r->Step(
+          PBMessage().From(from).To(1).Type(pb::MsgVote).Term(newTerm).LogTerm(newTerm).Index(4).v);
+
+      ASSERT_EQ(r->mails_.size(), 1);
+      ASSERT_EQ(r->mails_[0].type(), pb::MsgVoteResp);
+      ASSERT_FALSE(r->mails_[0].reject());
+      ASSERT_EQ(r->votedFor_, from);
+      ASSERT_EQ(r->currentTerm_, newTerm);
+      ASSERT_EQ(r->role_, Raft::kFollower);
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -387,4 +421,8 @@ TEST(Raft, CampaignWhileLeader) {
 
 TEST(Raft, DuelingCandidates) {
   yaraft::RaftTest::TestDuelingCandidates();
+}
+
+TEST(Raft, VoteFromAnyState) {
+  yaraft::RaftTest::TestVoteFromAnyState();
 }

@@ -41,7 +41,7 @@ class Raft : public StateMachine {
   };
 
  public:
-  enum StateRole { kFollower, kCandidate, kLeader };
+  enum StateRole { kFollower, kCandidate, kLeader, kStateNum };
 
   explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {
     LOG_ASSERT(conf->Validate());
@@ -291,6 +291,8 @@ class Raft : public StateMachine {
         break;
       case kFollower:
         stepFollower(m);
+      default:
+        break;
     }
   }
 
@@ -307,6 +309,9 @@ class Raft : public StateMachine {
       case kFollower:
       case kCandidate:
         tickElection();
+        break;
+      default:
+        break;
     }
   }
 
