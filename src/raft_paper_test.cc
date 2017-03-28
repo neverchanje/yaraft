@@ -197,7 +197,7 @@ class RaftPaperTest {
       r->becomeCandidate();
       r->becomeLeader();
       r->mails_.clear();
-      ASSERT_EQ(r->prs_[1].MatchIndex(), 2);
+      ASSERT_EQ(r->prs_[1].MatchIndex(), 3);  // includes empty entry appended by new leader
       ASSERT_EQ(r->currentTerm_, 3);
 
       // append a empty entry with index = 3
@@ -208,7 +208,7 @@ class RaftPaperTest {
                   .Term(r->currentTerm_)
                   .Entries({pb::Entry()})
                   .v);
-      ASSERT_EQ(r->prs_[1].MatchIndex(), 3);
+      ASSERT_EQ(r->prs_[1].MatchIndex(), 4);
 
       r->Step(
           PBMessage().From(2).To(1).Type(pb::MsgAppResp).Term(r->currentTerm_).Index(t.index).v);

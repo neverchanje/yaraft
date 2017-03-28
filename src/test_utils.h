@@ -67,6 +67,10 @@ struct Network {
         m.set_term(peers_[from]->currentTerm_);
     }
 
+    if (cutMap_[from] == to) {
+      return;
+    }
+
     peers_[to]->Step(m);
 
     auto& responses = peers_[to]->mails_;
@@ -101,20 +105,38 @@ struct Network {
     for (uint64_t id = 1; id <= PeerSize(); id++) {
       if (id == cand)
         continue;
-      if (peers_.find(id) != peers_.end()) {
-        auto vote = MustTake(cand, id, pb::MsgVote);
+      auto vote = MustTake(cand, id, pb::MsgVote);
+      if (cutMap_[cand] != id && peers_.find(id) != peers_.end())
         Send(vote);
-      }
     }
 
     // Receive vote responses
     for (uint64_t id = 1; id <= PeerSize(); id++) {
-      if (id == cand)
+      if (id == cand || cutMap_[cand] == id || peers_.find(id) == peers_.end())
         continue;
-      if (peers_.find(id) != peers_.end()) {
-        auto voteResp = MustTake(id, cand, pb::MsgVoteResp);
-        Send(voteResp);
-      }
+      auto voteResp = MustTake(id, cand, pb::MsgVoteResp);
+      Send(voteResp);
+    }
+
+    if (peers_[cand]->role_ == Raft::kLeader) {
+      ReplicateAppend(cand);
+    }
+  }
+
+  void ReplicateAppend(uint64_t lead) {
+    for (uint64_t id = 1; id <= PeerSize(); id++) {
+      if (id == lead)
+        continue;
+      auto app = MustTake(lead, id, pb::MsgApp);
+      if (cutMap_[lead] != id && peers_.find(id) != peers_.end())
+        Send(app);
+    }
+
+    for (uint64_t id = 1; id <= PeerSize(); id++) {
+      if (id == lead || cutMap_[lead] == id || peers_.find(id) == peers_.end())
+        continue;
+      auto appResp = MustTake(id, lead, pb::MsgAppResp);
+      Send(appResp);
     }
   }
 
@@ -165,12 +187,26 @@ struct Network {
     return this;
   }
 
+  // Cut down the connection between n1 and n2.
+  void Cut(uint64_t n1, uint64_t n2) {
+    cutMap_[n1] = n2;
+    cutMap_[n2] = n1;
+  }
+
+  // Restore the connection between n1 and n2.
+  void Restore(uint64_t n1, uint64_t n2) {
+    cutMap_.erase(cutMap_.find(n1));
+    cutMap_.erase(cutMap_.find(n2));
+  }
+
  private:
   std::unordered_map<uint64_t, Raft*> peers_;
   size_t size_;
 
   // to => Message
   std::unordered_map<uint64_t, std::list<pb::Message>> mailTo_;
+
+  std::unordered_map<uint64_t, uint64_t> cutMap_;
 };
 
 pb::Entry pbEntry(uint64_t index, uint64_t term) {

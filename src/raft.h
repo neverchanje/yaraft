@@ -168,7 +168,6 @@ class Raft : public StateMachine {
     }
     prs_[id_].MatchIndex(log_->LastIndex());
 
-    // TODO: why?
     appendRawEntries(PBMessage().Entries({PBEntry().Data(nullptr).v}).v);
 
     LOG(INFO) << id_ << " became leader at term " << currentTerm_;
@@ -500,7 +499,7 @@ class Raft : public StateMachine {
     becomeCandidate();
 
     // vote for itself
-    Step(PBMessage().From(1).To(1).Term(currentTerm_).Type(pb::MsgVoteResp).v);
+    Step(PBMessage().From(id_).To(id_).Term(currentTerm_).Type(pb::MsgVoteResp).v);
 
     auto m = PBMessage()
                  .Term(currentTerm_)

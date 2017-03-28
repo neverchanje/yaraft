@@ -316,6 +316,33 @@ class RaftTest {
     r->Step(PBMessage().From(1).To(1).Type(pb::MsgHup).Term(1).v);
     ASSERT_EQ(r->role_, Raft::kLeader);
   }
+
+  static void TestDuelingCandidates() {
+    std::unique_ptr<Network> n(Network::New(3));
+    n->Cut(1, 3);
+    n->RaiseElection(1);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+    ASSERT_EQ(n->Peer(1)->log_->CommitIndex(), 1);
+    ASSERT_EQ(n->Peer(2)->log_->LastIndex(), 1);
+    ASSERT_EQ(n->Peer(3)->log_->LastIndex(), 0);
+
+    // 3 stays as candidate since it receives a vote from 3 and a rejection from 2
+    n->RaiseElection(3);
+    ASSERT_EQ(n->Peer(3)->role_, Raft::kCandidate);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+    ASSERT_EQ(n->Peer(2)->Term(), 1);
+
+    n->Restore(1, 3);
+
+    // candidate 3 now increases its term and tries to vote again
+    // we expect it to disrupt the leader 1 since it has a higher term
+    // 3 will be follower again since both 1 and 2 rejects its vote request
+    // since 3 does not have a long enough log
+    n->RaiseElection(3);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kFollower);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kFollower);
+    ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
+  }
 };
 
 }  // namespace yaraft
@@ -356,4 +383,8 @@ TEST(Raft, Commit) {
 
 TEST(Raft, CampaignWhileLeader) {
   yaraft::RaftTest::TestCampaignWhileLeader();
+}
+
+TEST(Raft, DuelingCandidates) {
+  yaraft::RaftTest::TestDuelingCandidates();
 }
