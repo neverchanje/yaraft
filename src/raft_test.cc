@@ -250,15 +250,19 @@ class RaftTest {
   // and be elected in turn. This ensures that elections (including
   // pre-vote) work when not starting from a clean slate (as they do in
   // TestLeaderElection)
-  static void TestLeaderCycle() {
-    for (uint64_t cand = 1; cand <= 3; cand++) {
-      Network* n = Network::New(3);
+  static void TestLeaderCycle(bool preVote) {
+    for (uint64_t cand = 1; cand <= 1; cand++) {
+      std::unique_ptr<Network> n(Network::New(3));
+
+      if (preVote) {
+        n->MutablePeerConfig(cand)->preVote = true;
+      }
+
       n->RaiseElection(cand);
 
       for (uint64_t id = 1; id <= 3; id++) {
         ASSERT_EQ(n->Peer(id)->role_, cand == id ? Raft::kLeader : Raft::kFollower);
       }
-      delete n;
     }
   }
 
@@ -360,7 +364,9 @@ class RaftTest {
       } else if (role == Raft::kLeader) {
         r->becomeCandidate();
         r->becomeLeader();
-      } else {
+      } else if (role == Raft::kPreCandidate) {
+        r->becomeFollower(1, 3);
+        r->becomePreCandidate();
       }
       ASSERT_EQ(r->Term(), 1);
 
@@ -408,7 +414,11 @@ TEST(Raft, LeaderElection) {
 }
 
 TEST(Raft, LeaderCycle) {
-  yaraft::RaftTest::TestLeaderCycle();
+  yaraft::RaftTest::TestLeaderCycle(false);
+}
+
+TEST(Raft, LeaderCyclePreVote) {
+  yaraft::RaftTest::TestLeaderCycle(true);
 }
 
 TEST(Raft, Commit) {
