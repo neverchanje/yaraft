@@ -33,6 +33,7 @@ Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, in
   conf->storage = storage;
   conf->peers = std::move(peers);
   conf->maxSizePerMsg = std::numeric_limits<uint64_t>::max();
+  conf->preVote = false;
   return conf;
 }
 
@@ -58,17 +59,13 @@ struct Network {
   void Send(pb::Message m) {
     uint64_t to = m.to(), from = m.from();
 
-    if (peers_.find(to) == peers_.end()) {
+    if (peers_.find(to) == peers_.end() || cutMap_[from] == to) {
       return;
     }
 
-    if (m.type() != pb::MsgVote) {
+    if (m.type() != pb::MsgVote && m.type() != pb::MsgPreVote) {
       if (peers_.find(from) != peers_.end())
         m.set_term(peers_[from]->currentTerm_);
-    }
-
-    if (cutMap_[from] == to) {
-      return;
     }
 
     peers_[to]->Step(m);
@@ -101,21 +98,23 @@ struct Network {
   void RaiseElection(uint64_t cand = 1) {
     Send(PBMessage().From(cand).To(cand).Type(pb::MsgHup).v);
 
-    // Broadcast request votes to peers
+    if (Peer(cand)->c_->preVote) {
+      for (uint64_t id = 1; id <= PeerSize(); id++) {
+        if (id == cand)
+          continue;
+        TakeSingleRound(pb::MsgPreVote, cand, id);
+      }
+
+      // Leave if the election doesn't progress.
+      if (Peer(cand)->role_ == Raft::kPreCandidate) {
+        return;
+      }
+    }
+
     for (uint64_t id = 1; id <= PeerSize(); id++) {
       if (id == cand)
         continue;
-      auto vote = MustTake(cand, id, pb::MsgVote);
-      if (cutMap_[cand] != id && peers_.find(id) != peers_.end())
-        Send(vote);
-    }
-
-    // Receive vote responses
-    for (uint64_t id = 1; id <= PeerSize(); id++) {
-      if (id == cand || cutMap_[cand] == id || peers_.find(id) == peers_.end())
-        continue;
-      auto voteResp = MustTake(id, cand, pb::MsgVoteResp);
-      Send(voteResp);
+      TakeSingleRound(pb::MsgVote, cand, id);
     }
 
     if (peers_[cand]->role_ == Raft::kLeader) {
@@ -127,16 +126,18 @@ struct Network {
     for (uint64_t id = 1; id <= PeerSize(); id++) {
       if (id == lead)
         continue;
-      auto app = MustTake(lead, id, pb::MsgApp);
-      if (cutMap_[lead] != id && peers_.find(id) != peers_.end())
-        Send(app);
+      TakeSingleRound(pb::MsgApp, lead, id);
     }
+  }
 
-    for (uint64_t id = 1; id <= PeerSize(); id++) {
-      if (id == lead || cutMap_[lead] == id || peers_.find(id) == peers_.end())
-        continue;
-      auto appResp = MustTake(id, lead, pb::MsgAppResp);
-      Send(appResp);
+  // Simulate a single round of request response.
+  void TakeSingleRound(pb::MessageType type, uint64_t from, uint64_t to) {
+    // Drop the request if the remote peer is dead or the connection to remote is cut down.
+    auto req = MustTake(from, to, type);
+    if (cutMap_[from] != to && peers_.find(to) != peers_.end()) {
+      Send(req);
+      auto resp = MustTake(to, from, responseType(type));
+      Send(resp);
     }
   }
 
@@ -169,6 +170,10 @@ struct Network {
     return peers_[id];
   }
 
+  Config* MutablePeerConfig(uint64_t id) {
+    return const_cast<Config*>(peers_[id]->c_.get());
+  }
+
   uint64_t PeerSize() const {
     return size_;
   }
@@ -197,6 +202,21 @@ struct Network {
   void Restore(uint64_t n1, uint64_t n2) {
     cutMap_.erase(cutMap_.find(n1));
     cutMap_.erase(cutMap_.find(n2));
+  }
+
+ private:
+  pb::MessageType responseType(pb::MessageType type) {
+    switch (type) {
+      case pb::MsgApp:
+        return pb::MsgAppResp;
+      case pb::MsgVote:
+        return pb::MsgVoteResp;
+      case pb::MsgPreVote:
+        return pb::MsgPreVoteResp;
+      default:
+        DLOG(FATAL) << "Error type: " << pb::MessageType_Name(type);
+        return pb::MessageType(0);
+    }
   }
 
  private:
