@@ -12,7 +12,7 @@ the comments present in the code.
 |Leader|MsgHeartbeatResp|Resend AppendEntries when the follower was detected falling behind.|
 |Leader|MsgVoteResp|[Handle MsgVoteResp](#handle-requestvote-response)|
 |Leader|MsgProp|Handle MsgProp|
-|Follower|MsgHup|[Convert to Candidate](#convert-to-candidate-requestvote)|
+|Follower|MsgHup|[Convert to Candidate](#convert-to-candidate)|
 |Follower|MsgApp|[Handle AppendEntries](#handle-appendentries)|
 |Follower|MsgTimeoutNow||
 
@@ -41,15 +41,18 @@ the comments present in the code.
 |matchIndex|The latest entry that each follower has acknowledged is the same as the leader's. This is used to calculate commitIndex on the leader.|\\|
 
 ### Convert to Follower
-- Set `currentLeader` to where the message came from. 
-- Reset election timer + Reset random election timeout.
-- Set `currentTerm` to the leader's term.
-- Reset `votedFor` to nil.
 
-### Convert to Candidate (RequestVote)
+@see `Raft::becomeFollower`
+
+- Set `currentLeader` to where the message came from. 
+- Reset random election timeout.
+- Set `currentTerm` to the leader's term.
+- **Reset `votedFor` to nil**. 
+
+### Convert to Candidate
 - Increment `currentTerm`.
 - Vote for itself.
-- Reset election timer + Reset random election timeout.
+- Reset random election timeout.
 - Set `state` to Candidate.
 - Send RequestVote RPCs to all other servers.
 - *TODO*: Do not resend RequestVote to those have granted the vote.
@@ -75,10 +78,17 @@ as well.
 
 ### Handle RequestVote
 
-- Assert(m.Term == `currentTerm`)
-- Condition for granting the vote: if the MsgVote is at least as "up-to-date" as the voter's latest log,
-and either if we have voted for the same candidate, or we haven't voted for any candidate.
+@see `Raft::handleMsgVote`
+
+- Assert(m.Term == `currentTerm`), the voter will reset `currentTerm` to the term of MsgVote if
+it's larger, before this logic.
+- Requirements for granting the vote: 
+    * if the MsgVote is at least as "up-to-date" as the voter's log,
+    * && either if 
+        * the voter has voted for the same candidate (`votedFor` == `voteRequest.from()`),
+        * || it's not voted for any candidate **in the given term** (`votedFor == nil`).
 - Set `votedFor` when we grant the vote.
+- Reset election timer.
 
 ### Handle RequestVote Response
 
