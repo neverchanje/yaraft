@@ -38,10 +38,14 @@ class Raft : public StateMachine {
     // kCampaignElection represents a normal (time-based) election (the second phase
     // of the election when Config.preVote is true).
     kCampaignElection,
+
+    // kCampaignPreElection represents the first phase of a normal election when
+    // Config.PreVote is true.
+    kCampaignPreElection,
   };
 
  public:
-  enum StateRole { kFollower, kCandidate, kLeader, kStateNum };
+  enum StateRole { kFollower, kCandidate, kPreCandidate, kLeader, kStateNum };
 
   explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {
     LOG_ASSERT(conf->Validate());
@@ -75,7 +79,7 @@ class Raft : public StateMachine {
         log_->LastTerm());
   }
 
-  virtual Status Step(pb::Message& m) override {
+  Status Step(pb::Message& m) override {
     if (currentTerm_ > m.term()) {
       // ignore the message
 
@@ -86,31 +90,45 @@ class Raft : public StateMachine {
     }
 
     if (currentTerm_ < m.term()) {
-      uint64_t lead = m.from();
-      if (m.type() == pb::MsgVote) {
-        lead = 0;
+      if (m.type() == pb::MsgPreVote) {
+        // currentTerm never changes when receiving a PreVote.
+      } else if (m.type() == pb::MsgPreVoteResp && !m.reject()) {
+        // We send pre-vote requests with a term in our future. If the
+        // pre-vote is granted, we will increment our term when we get a
+        // quorum. If it is not, the term comes from the node that
+        // rejected our vote so we should become a follower at the new
+        // term.
+      } else {
+        uint64_t lead = m.from();
+        if (m.type() == pb::MsgVote) {
+          lead = 0;
+        }
+
+        LOG(INFO) << fmt::format(
+            "{:x} [term: {:d}] received a {:s} message with higher term from {:x} [term: {:d}]",
+            id_, currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
+
+        becomeFollower(m.term(), lead);
       }
-
-      // Any messages (even a vote, except for prevote) will cause current node to step down as
-      // follower.
-      LOG(INFO) << fmt::format(
-          "{:x} [term: {:d}] received a {:s} message with higher term from {:x} [term: {:d}]", id_,
-          currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
-
-      becomeFollower(m.term(), lead);
     }
 
     DLOG_ASSERT(currentTerm_ <= m.term());
 
     switch (m.type()) {
       case pb::MsgHup:
-        LOG_ASSERT(role_ == kFollower ||
-                   role_ == kCandidate);  // candidates may re-elect itself continuously.
+        DLOG_ASSERT(role_ != kLeader);
         LOG(INFO) << id_ << " is starting a new election at term " << currentTerm_;
-        campaign(kCampaignElection);
+        if (c_->preVote) {
+          campaign(kCampaignPreElection);
+        } else {
+          campaign(kCampaignElection);
+        }
         break;
       case pb::MsgVote:
         handleMsgVote(m);
+        break;
+      case pb::MsgPreVote:
+        handleMsgPreVote(m);
         break;
       default:
         step_(m);
@@ -132,11 +150,19 @@ class Raft : public StateMachine {
     currentLeader_ = lead;
     currentTerm_ = term;
 
-    electionElapsed_ = 0;
     votedFor_ = 0;
     resetRandomizedElectionTimeout();
 
     LOG(INFO) << id_ << " became follower at term " << currentTerm_;
+  }
+
+  void becomePreCandidate() {
+    role_ = kPreCandidate;
+
+    // Becoming a pre-candidate changes our state,
+    // but doesn't change anything else. In particular it does not increase
+    // currentTerm_ or change votedFor.
+    LOG(INFO) << id_ << " became pre-candidate at term " << currentTerm_;
   }
 
   void becomeCandidate() {
@@ -149,7 +175,6 @@ class Raft : public StateMachine {
     votedFor_ = id_;
 
     currentTerm_++;
-    electionElapsed_ = 0;
     currentLeader_ = 0;
     resetRandomizedElectionTimeout();
   }
@@ -159,7 +184,6 @@ class Raft : public StateMachine {
       throw RaftError("invalid transition [follower -> leader]");
 
     role_ = kLeader;
-    heartbeatElapsed_ = 0;
     currentLeader_ = id_;
     prs_.clear();
 
@@ -213,6 +237,25 @@ class Raft : public StateMachine {
     return gr;
   }
 
+  void handleMsgPreVote(const pb::Message& m) {
+    // If a raft node receives a PreVote within the election timeout of hearing from a current
+    // leader, it does not grants the pre-vote.
+    if (currentLeader_ != 0 && electionElapsed_ < randomizedElectionTimeout_) {
+      LOG(INFO) << fmt::format(
+          "{:x} [logterm: {:d}, index: {:d}, vote: {:x}] ignored {:s} from {:x} [logterm: "
+          "{:d}, index: {:d}] at term {:d}: lease is not expired (remaining ticks: {:d})",
+          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, m.type(), m.from(), m.logterm(),
+          m.index(), currentTerm_, randomizedElectionTimeout_ - electionElapsed_);
+      return;
+    }
+
+    bool reject = true;
+    if (m.term() > currentTerm_ && log_->IsUpToDate(m.index(), m.logterm())) {
+      reject = false;
+    }
+    sendVoteResp(m, reject);
+  }
+
   void handleMsgVote(const pb::Message& m) {
     if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
       // - If we haven't voted for any candidates, or
@@ -237,6 +280,7 @@ class Raft : public StateMachine {
       LOG(INFO) << fmt::format("{:x} received {:s} from {:x} at term {:d}", id_,
                                pb::MessageType_Name(m.type()), m.from(), currentTerm_);
     }
+
     voteGranted_[m.from()] = !m.reject();
 
     int gr = granted();
@@ -245,8 +289,13 @@ class Raft : public StateMachine {
         gr, pb::MessageType_Name(m.type()), voteGranted_.size() - gr);
 
     if (gr >= quorum()) {
-      becomeLeader();
-      bcastAppend();
+      if (m.type() == pb::MsgVoteResp) {
+        becomeLeader();
+        bcastAppend();
+      } else {
+        voteGranted_.clear();
+        campaign(kCampaignElection);
+      }
       return;
     }
 
@@ -257,17 +306,35 @@ class Raft : public StateMachine {
     }
   }
 
+  // stepCandidate is shared by StateCandidate and StatePreCandidate; the difference is
+  // whether they respond to MsgVoteResp or MsgPreVoteResp.
   void stepCandidate(pb::Message& m) {
     switch (m.type()) {
-      case pb::MsgVoteResp:
-        handleMsgVoteResp(m);
+      // Only handle vote responses corresponding to our candidacy (while in
+      // StateCandidate, we may get stale MsgPreVoteResp messages in this term from
+      // our pre-candidate state).
+      case pb::MsgPreVoteResp:
+        if (role_ == kPreCandidate)
+          handleMsgVoteResp(m);
         break;
+      case pb::MsgVoteResp:
+        if (role_ == kCandidate)
+          handleMsgVoteResp(m);
+        break;
+
+      // If a candidate receives an AppendEntries RPC from another server claiming
+      // to be leader whose term is at least as large as the candidate's current term,
+      // it recognizes the leader as legitimate and returns to follower state.
       case pb::MsgApp:
-        // if a candidate receives an AppendEntries RPC from another server claiming
-        // to be leader whose term is at least as large as the candidate's current term,
-        // it recognizes the leader as legitimate and returns to follower state.
         becomeFollower(m.term(), m.from());
         handleAppendEntries(m);
+        break;
+      case pb::MsgHeartbeat:
+        becomeFollower(m.term(), m.from());
+        handleHeartbeat(m);
+        break;
+
+      default:
         break;
     }
   }
@@ -287,6 +354,7 @@ class Raft : public StateMachine {
         stepLeader(m);
         break;
       case kCandidate:
+      case kPreCandidate:
         stepCandidate(m);
         break;
       case kFollower:
@@ -308,6 +376,7 @@ class Raft : public StateMachine {
         break;
       case kFollower:
       case kCandidate:
+      case kPreCandidate:
         tickElection();
         break;
       default:
@@ -336,15 +405,15 @@ class Raft : public StateMachine {
   void send(pb::Message& m) {
     m.set_from(id_);
 
-    if (m.type() == pb::MsgVote) {
-      DLOG_ASSERT(m.term() != 0) << fmt::format("term should be set when sending {:s}",
+    if (m.type() == pb::MsgVote || m.type() == pb::MsgPreVote) {
+      DLOG_ASSERT(m.term() != 0) << fmt::format(" term should be set when sending {:s}",
                                                 pb::MessageType_Name(m.type()));
     } else {
-      DLOG_ASSERT(m.term() == 0) << fmt::format("term should not be set when sending %s (was %d)",
-                                                pb::MessageType_Name(m.type()), m.term());
+      DLOG_ASSERT(m.term() == 0) << fmt::format(
+          " term should not be set when sending {:s} (was {:d})", pb::MessageType_Name(m.type()),
+          m.term());
       m.set_term(currentTerm_);
     }
-
     mails_.push_back(std::move(m));
   }
 
@@ -357,7 +426,7 @@ class Raft : public StateMachine {
         m.from(), m.logterm(), m.index(), currentTerm_);
 
     // send() will include term=currentTerm into message.
-    send(PBMessage().Reject(reject).To(m.from()).Type(pb::MsgVoteResp).v);
+    send(PBMessage().Reject(reject).To(m.from()).Type(voteRespType(m.type())).v);
   }
 
   // promotable indicates whether state machine can be promoted to leader,
@@ -499,26 +568,36 @@ class Raft : public StateMachine {
     send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).v);
   }
 
+  inline pb::MessageType voteRespType(pb::MessageType voteType) {
+    return voteType == pb::MsgVote ? pb::MsgVoteResp : pb::MsgPreVoteResp;
+  }
+
   void campaign(CampaignType type) {
-    DLOG_ASSERT(type == kCampaignElection);
-    becomeCandidate();
+    DLOG_ASSERT(type == kCampaignElection || type == kCampaignPreElection);
+
+    pb::MessageType voteType;
+    uint64_t term = currentTerm_ + 1;
+    if (type == kCampaignPreElection) {
+      voteType = pb::MsgPreVote;
+      becomePreCandidate();
+    } else {
+      voteType = pb::MsgVote;
+      becomeCandidate();
+    }
 
     // vote for itself
-    Step(PBMessage().From(id_).To(id_).Term(currentTerm_).Type(pb::MsgVoteResp).v);
+    Step(PBMessage().From(id_).To(id_).Term(term).Type(voteRespType(voteType)).v);
 
-    auto m = PBMessage()
-                 .Term(currentTerm_)
-                 .Type(pb::MsgVote)
-                 .Index(log_->LastIndex())
-                 .LogTerm(log_->LastTerm());
+    auto m =
+        PBMessage().Term(term).Type(voteType).Index(log_->LastIndex()).LogTerm(log_->LastTerm());
     for (const auto& e : prs_) {
       uint64_t peer_id = e.first;
       if (peer_id == id_)
         continue;
 
-      LOG(INFO) << fmt::format(
-          "{:x} [logterm: {:d}, index: {:d}] sent MsgVote to {:x} at term {:d}", id_,
-          log_->LastTerm(), log_->LastIndex(), peer_id, currentTerm_);
+      LOG(INFO) << fmt::format("{:x} [logterm: {:d}, index: {:d}] sent {:s} to {:x} at term {:d}",
+                               id_, log_->LastTerm(), log_->LastIndex(),
+                               pb::MessageType_Name(voteType), peer_id, term);
       send(m.To(peer_id).v);
     }
   }
@@ -544,7 +623,6 @@ class Raft : public StateMachine {
   // Number of ticks since it reached last electionTimeout when it is leader or candidate.
   // Number of ticks since it reached last electionTimeout or received a valid message from
   // current leader when it is a follower.
-  // electionElapsed is used for CheckQuorum machanism when it's leader.
   int electionElapsed_;
 
   // Number of ticks since it reached last heartbeatTimeout.
@@ -566,7 +644,7 @@ class Raft : public StateMachine {
 
   std::unordered_map<uint64_t, bool> voteGranted_;
 
-  const std::unique_ptr<const Config> c_;
+  std::unique_ptr<const Config> c_;
 
   // For unit tests to mock step_.
   std::function<void(pb::Message&)> step_;
