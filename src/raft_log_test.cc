@@ -71,7 +71,8 @@ TEST(RaftLog, Append) {
 
     RaftLog log(storage);
 
-    uint64_t index = log.Append(t.ents);
+    log.Append(t.ents);
+    uint64_t index = log.LastIndex();
     ASSERT_EQ(index, t.windex);
 
     EntryVec ents;
