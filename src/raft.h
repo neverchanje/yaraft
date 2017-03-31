@@ -47,7 +47,8 @@ class Raft : public StateMachine {
  public:
   enum StateRole { kFollower, kCandidate, kPreCandidate, kLeader, kStateNum };
 
-  explicit Raft(Config* conf) : c_(conf), log_(new RaftLog(conf->storage)) {
+  explicit Raft(Config* conf)
+      : c_(conf), log_(new RaftLog(conf->storage)), electionElapsed_(0), votedFor_(0) {
     LOG_ASSERT(conf->Validate());
 
     id_ = conf->id;
@@ -185,6 +186,7 @@ class Raft : public StateMachine {
 
     role_ = kLeader;
     currentLeader_ = id_;
+    heartbeatElapsed_ = 0;
     prs_.clear();
 
     for (uint64_t id : c_->peers) {
