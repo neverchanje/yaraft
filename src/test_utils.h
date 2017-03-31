@@ -18,9 +18,11 @@
 #include <list>
 
 #include "conf.h"
+#include "memory_storage.h"
 #include "raft.h"
 #include "raftpb.pb.h"
-#include "storage.h"
+
+#include <gtest/gtest.h>
 
 namespace yaraft {
 

@@ -1,49 +1,24 @@
-if (${BUILD_TEST})
-    add_executable(memory_storage_test
-            memory_storage_test.cc
-            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-            )
-    target_link_libraries(memory_storage_test
-            gtest gtest_main ${PROTOBUF_LIBRARY} ${GLOG_LIBRARY} ${FMT_LIBRARY})
+set(YARAFT_TEST_LINK_LIBS
+        gtest gtest_main
+        ${PROTOBUF_STATIC_LIBRARY}
+        ${FMT_LIBRARY}
+        ${GLOG_STATIC_LIB})
 
-    add_executable(util_test
-            util_test.cc
-            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-            )
-    target_link_libraries(util_test
-            gtest gtest_main ${PROTOBUF_LIBRARY})
+function(ADD_YARAFT_TEST TEST_NAME)
+    add_executable(${TEST_NAME} ${TEST_NAME}.cc ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc)
+    target_link_libraries(${TEST_NAME} ${YARAFT_TEST_LINK_LIBS})
+endfunction()
 
-    add_executable(progress_test
-            progress_test.cc
-            )
-    target_link_libraries(progress_test
-            gtest gtest_main)
+ADD_YARAFT_TEST(memory_storage_test)
 
-    add_executable(raft_log_test
-            raft_log_test.cc
-            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-            )
-    target_link_libraries(raft_log_test
-            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
+ADD_YARAFT_TEST(util_test)
 
-    add_executable(raft_test
-            raft_test.cc
-            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-            )
-    target_link_libraries(raft_test
-            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
+ADD_YARAFT_TEST(progress_test)
 
-    add_executable(raft_paper_test
-            raft_paper_test.cc
-            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-            )
-    target_link_libraries(raft_paper_test
-            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
+ADD_YARAFT_TEST(raft_log_test)
 
-    add_executable(unstable_test
-            unstable_test.cc
-            ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc
-            )
-    target_link_libraries(unstable_test
-            gtest gtest_main ${PROTOBUF_LIBRARY} ${FMT_LIBRARY} ${GLOG_LIBRARY})
-endif ()
+ADD_YARAFT_TEST(raft_test)
+
+ADD_YARAFT_TEST(raft_paper_test)
+
+ADD_YARAFT_TEST(unstable_test)
