@@ -157,6 +157,7 @@ TEST(MemoryStorage, Append) {
 
   for (auto t : tests) {
     MemStoreUptr storage(new MemoryStorage());
+    storage->TEST_Entries().clear();
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
     storage->Append(t.entries);
 
