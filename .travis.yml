@@ -1,0 +1,19 @@
+language: cpp
+sudo: required
+dist: trusty
+compiler:
+- clang
+- g++
+
+branches:
+  only:
+  - master
+
+install:
+- sudo apt update
+- sudo apt-get -y install libboost-dev
+- bash install_deps_if_neccessary.sh
+
+script:
+- cd build && cmake .. && make
+- bash ../run-tests.sh

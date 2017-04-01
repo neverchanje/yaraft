@@ -1,4 +1,5 @@
 # yaraft
+[![Build Status](https://travis-ci.org/neverchanje/yaraft.svg)](https://travis-ci.org/neverchanje/yaraft)
 
 yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/raft) from golang to C++11.
 
@@ -6,7 +7,7 @@ yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/
 
 - [x] Leader Election
 - [x] Log Replication
-- [ ] Prevote
+- [x] PreVote
 - [ ] CheckQuorum
 - [ ] Log Compaction / InstallSnapshot
 - [ ] Flow Control
@@ -14,7 +15,14 @@ yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/
 - [x] Single-Node Cluster
 - [ ] Read-only
 - [ ] Leader Transfer
-- [ ] Leader Stickiness
+
+## Installation
+
+```
+sudo apt-get -y install libboost-dev
+bash install_deps_if_neccessary.sh
+cd build && cmake .. && make && make install
+```
 
 ## License
 
