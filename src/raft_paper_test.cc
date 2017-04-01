@@ -112,7 +112,7 @@ class RaftPaperTest {
       r->becomeCandidate();
     }
 
-    for (int i = 0; i < 2 * electionTimeout; i++) {
+    for (int i = 1; i < 2 * electionTimeout; i++) {
       r->_tick();
     }
 
@@ -694,6 +694,20 @@ class RaftPaperTest {
     ASSERT_EQ(r->mails_.size(), 1);
     ASSERT_EQ(DumpPB(r->mails_[0]),
               DumpPB(PBMessage().From(1).To(3).Type(pb::MsgVoteResp).Term(4).Reject(false).v));
+    r->mails_.clear();
+
+    r->Step(PBMessage().From(2).To(1).Type(pb::MsgVote).Term(4).v);
+    ASSERT_EQ(r->votedFor_, 3);
+    ASSERT_EQ(r->mails_.size(), 1);
+    ASSERT_EQ(DumpPB(r->mails_[0]),
+              DumpPB(PBMessage().From(1).To(2).Type(pb::MsgVoteResp).Term(4).Reject(true).v));
+    r->mails_.clear();
+
+    r->Step(PBMessage().From(2).To(1).Type(pb::MsgVote).Term(5).v);
+    ASSERT_EQ(r->votedFor_, 2);
+    ASSERT_EQ(r->mails_.size(), 1);
+    ASSERT_EQ(DumpPB(r->mails_[0]),
+              DumpPB(PBMessage().From(1).To(2).Type(pb::MsgVoteResp).Term(5).Reject(false).v));
     r->mails_.clear();
   }
 
