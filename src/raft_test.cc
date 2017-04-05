@@ -213,7 +213,7 @@ class RaftTest {
     ASSERT_EQ(raft->mails_.size(), 0);
   }
 
-  static void TestLeaderElection() {
+  static void TestLeaderElection(bool preVote) {
     struct TestData {
       Network *network;
       Raft::StateRole role;
@@ -237,10 +237,17 @@ class RaftTest {
     };
 
     for (auto t : tests) {
+      t.network->SetPreVote(preVote);
       t.network->RaiseElection(1);
 
       auto node = t.network->Peer(1);
+
+      if (preVote && t.role == Raft::kCandidate) {
+        t.role = Raft::kPreCandidate;
+        t.wterm = 0;
+      }
       ASSERT_EQ(node->role_, t.role);
+
       ASSERT_EQ(node->currentTerm_, t.wterm);
       delete t.network;
     }
@@ -253,11 +260,7 @@ class RaftTest {
   static void TestLeaderCycle(bool preVote) {
     for (uint64_t cand = 1; cand <= 1; cand++) {
       std::unique_ptr<Network> n(Network::New(3));
-
-      if (preVote) {
-        n->MutablePeerConfig(cand)->preVote = true;
-      }
-
+      n->SetPreVote(preVote);
       n->RaiseElection(cand);
 
       for (uint64_t id = 1; id <= 3; id++) {
@@ -436,7 +439,11 @@ TEST(Raft, HandleHeartbeatResp) {
 TEST(Raft, LogReplication) {}
 
 TEST(Raft, LeaderElection) {
-  RaftTest::TestLeaderElection();
+  RaftTest::TestLeaderElection(false);
+}
+
+TEST(Raft, LeaderElectionPreVote) {
+  RaftTest::TestLeaderElection(true);
 }
 
 TEST(Raft, LeaderCycle) {

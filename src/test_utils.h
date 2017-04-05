@@ -176,6 +176,12 @@ struct Network {
     return const_cast<Config*>(peers_[id]->c_.get());
   }
 
+  void SetPreVote(bool preVote) {
+    for (auto& p : peers_) {
+      MutablePeerConfig(p.second->id_)->preVote = preVote;
+    }
+  }
+
   uint64_t PeerSize() const {
     return size_;
   }
