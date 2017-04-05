@@ -394,6 +394,19 @@ class RaftTest {
       }
     }
   }
+
+  static void TestSingleNodeCandidate() {
+    std::unique_ptr<Network> n(Network::New(1));
+    n->RaiseElection(1);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+  }
+
+  static void TestSingleNodePreCandidate() {
+    std::unique_ptr<Network> n(Network::New(1));
+    n->RaiseElection(1);
+    n->MutablePeerConfig(1)->preVote = true;
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+  }
 };
 
 }  // namespace yaraft
@@ -452,4 +465,12 @@ TEST(Raft, VoteFromAnyState) {
 
 TEST(Raft, PreVoteFromAnyState) {
   RaftTest::TestVoteFromAnyState(pb::MsgPreVote);
+}
+
+TEST(Raft, SingleNodeCandidate) {
+  RaftTest::TestSingleNodeCandidate();
+}
+
+TEST(Raft, SingleNodePreCandidate) {
+  RaftTest::TestSingleNodePreCandidate();
 }
