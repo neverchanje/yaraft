@@ -410,6 +410,20 @@ class RaftTest {
     n->MutablePeerConfig(1)->preVote = true;
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
   }
+
+  static void TestSingleNodeCommit() {
+    std::unique_ptr<Network> n(Network::New(1));
+    n->RaiseElection(1);
+    n->ReplicateAppend(1);
+
+    n->Send(PBMessage().From(1).To(1).Type(pb::MsgProp).Entries({PBEntry().Data("somedata").v}).v);
+    n->ReplicateAppend(1);
+
+    n->Send(PBMessage().From(1).To(1).Type(pb::MsgProp).Entries({PBEntry().Data("somedata").v}).v);
+    n->ReplicateAppend(1);
+
+    ASSERT_EQ(n->Peer(1)->log_->CommitIndex(), 3);
+  }
 };
 
 }  // namespace yaraft
@@ -480,4 +494,8 @@ TEST(Raft, SingleNodeCandidate) {
 
 TEST(Raft, SingleNodePreCandidate) {
   RaftTest::TestSingleNodePreCandidate();
+}
+
+TEST(Raft, SingleNodeCommit) {
+  RaftTest::TestSingleNodeCommit();
 }
