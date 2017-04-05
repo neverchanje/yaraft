@@ -33,6 +33,10 @@
 
 namespace yaraft {
 
+inline pb::MessageType voteRespType(pb::MessageType voteType) {
+  return voteType == pb::MsgVote ? pb::MsgVoteResp : pb::MsgPreVoteResp;
+}
+
 class Raft : public StateMachine {
   enum CampaignType {
     // kCampaignElection represents a normal (time-based) election (the second phase
@@ -83,7 +87,6 @@ class Raft : public StateMachine {
   Status Step(pb::Message& m) override {
     if (currentTerm_ > m.term()) {
       // ignore the message
-
       LOG(INFO) << fmt::format(
           "{:x} [term: {:d}] ignored a {:s} message with lower term from {:x} [term: {:d}]", id_,
           currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
@@ -246,8 +249,9 @@ class Raft : public StateMachine {
       LOG(INFO) << fmt::format(
           "{:x} [logterm: {:d}, index: {:d}, vote: {:x}] ignored {:s} from {:x} [logterm: "
           "{:d}, index: {:d}] at term {:d}: lease is not expired (remaining ticks: {:d})",
-          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, m.type(), m.from(), m.logterm(),
-          m.index(), currentTerm_, randomizedElectionTimeout_ - electionElapsed_);
+          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+          m.from(), m.logterm(), m.index(), currentTerm_,
+          randomizedElectionTimeout_ - electionElapsed_);
       return;
     }
 
@@ -568,10 +572,6 @@ class Raft : public StateMachine {
 
     log_->CommitTo(m.commit());
     send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).v);
-  }
-
-  inline pb::MessageType voteRespType(pb::MessageType voteType) {
-    return voteType == pb::MsgVote ? pb::MsgVoteResp : pb::MsgPreVoteResp;
   }
 
   void campaign(CampaignType type) {

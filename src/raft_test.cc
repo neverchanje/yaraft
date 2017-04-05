@@ -29,7 +29,7 @@ class RaftTest {
     RaftUPtr raft(newTestRaft(1, {1}, 10, 1, new MemoryStorage()));
 
     bool called = false;
-    raft->step_ = [&](const pb::Message& m) { called = true; };
+    raft->step_ = [&](const pb::Message &m) { called = true; };
 
     raft->currentTerm_ = 2;
 
@@ -144,7 +144,7 @@ class RaftTest {
           default:
             break;
         }
-      } catch (RaftError& e) {
+      } catch (RaftError &e) {
         failed = true;
       }
       ASSERT_EQ(!t.wallow, failed);
@@ -215,7 +215,7 @@ class RaftTest {
 
   static void TestLeaderElection() {
     struct TestData {
-      Network* network;
+      Network *network;
       Raft::StateRole role;
 
       uint64_t wterm;
@@ -352,7 +352,7 @@ class RaftTest {
 
   // TestVoteFromAnyState ensures that no matter what state a node is from,
   // it will always step down and vote for a legal candidate.
-  static void TestVoteFromAnyState() {
+  static void TestVoteFromAnyState(pb::MessageType type) {
     for (int i = 0; i < Raft::kStateNum; i++) {
       auto role = Raft::StateRole(i);
       RaftUPtr r(newTestRaft(1, {1, 2, 3}, 10, 1, new MemoryStorage()));
@@ -372,67 +372,84 @@ class RaftTest {
 
       uint64_t newTerm = 2;
       uint64_t from = 2;
-      r->Step(
-          PBMessage().From(from).To(1).Type(pb::MsgVote).Term(newTerm).LogTerm(newTerm).Index(4).v);
+      r->Step(PBMessage().From(from).To(1).Type(type).Term(newTerm).LogTerm(newTerm).Index(4).v);
 
-      ASSERT_EQ(r->mails_.size(), 1);
-      ASSERT_EQ(r->mails_[0].type(), pb::MsgVoteResp);
-      ASSERT_FALSE(r->mails_[0].reject());
-      ASSERT_EQ(r->votedFor_, from);
-      ASSERT_EQ(r->currentTerm_, newTerm);
-      ASSERT_EQ(r->role_, Raft::kFollower);
+      if (type == pb::MsgVote) {
+        // If this was a real vote, we reset our state and term.
+        ASSERT_EQ(r->mails_.size(), 1);
+        ASSERT_EQ(r->mails_[0].type(), voteRespType(type));
+        ASSERT_FALSE(r->mails_[0].reject());
+        ASSERT_EQ(r->votedFor_, from);
+        ASSERT_EQ(r->currentTerm_, newTerm);
+        ASSERT_EQ(r->role_, Raft::kFollower);
+      } else {
+        // pre-vote doesn't change anything.
+        if (r->role_ == Raft::kCandidate || r->role_ == Raft::kLeader) {
+          ASSERT_EQ(r->votedFor_, r->id_);
+        } else {
+          ASSERT_EQ(r->votedFor_, 0);
+        }
+        ASSERT_EQ(r->currentTerm_, 1);
+        ASSERT_EQ(r->role_, role);
+      }
     }
   }
 };
 
 }  // namespace yaraft
 
+using namespace yaraft;
+
 TEST(Raft, StepIgnoreOldTermMsg) {
-  yaraft::RaftTest::TestStepIgnoreOldTermMsg();
+  RaftTest::TestStepIgnoreOldTermMsg();
 }
 
 TEST(Raft, HandleAppendEntries) {
-  yaraft::RaftTest::TestHandleMsgApp();
+  RaftTest::TestHandleMsgApp();
 }
 
 TEST(Raft, StateTransition) {
-  yaraft::RaftTest::TestStateTransition();
+  RaftTest::TestStateTransition();
 }
 
 TEST(Raft, HandleHeartbeat) {
-  yaraft::RaftTest::TestHandleHeartbeat();
+  RaftTest::TestHandleHeartbeat();
 }
 
 TEST(Raft, HandleHeartbeatResp) {
-  yaraft::RaftTest::TestHandleHeartbeatResp();
+  RaftTest::TestHandleHeartbeatResp();
 }
 
 TEST(Raft, LogReplication) {}
 
 TEST(Raft, LeaderElection) {
-  yaraft::RaftTest::TestLeaderElection();
+  RaftTest::TestLeaderElection();
 }
 
 TEST(Raft, LeaderCycle) {
-  yaraft::RaftTest::TestLeaderCycle(false);
+  RaftTest::TestLeaderCycle(false);
 }
 
 TEST(Raft, LeaderCyclePreVote) {
-  yaraft::RaftTest::TestLeaderCycle(true);
+  RaftTest::TestLeaderCycle(true);
 }
 
 TEST(Raft, Commit) {
-  yaraft::RaftTest::TestCommit();
+  RaftTest::TestCommit();
 }
 
 TEST(Raft, CampaignWhileLeader) {
-  yaraft::RaftTest::TestCampaignWhileLeader();
+  RaftTest::TestCampaignWhileLeader();
 }
 
 TEST(Raft, DuelingCandidates) {
-  yaraft::RaftTest::TestDuelingCandidates();
+  RaftTest::TestDuelingCandidates();
 }
 
 TEST(Raft, VoteFromAnyState) {
-  yaraft::RaftTest::TestVoteFromAnyState();
+  RaftTest::TestVoteFromAnyState(pb::MsgVote);
+}
+
+TEST(Raft, PreVoteFromAnyState) {
+  RaftTest::TestVoteFromAnyState(pb::MsgPreVote);
 }
