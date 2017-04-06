@@ -243,23 +243,39 @@ class Raft : public StateMachine {
   }
 
   void handleMsgPreVote(const pb::Message& m) {
-    // If a raft node receives a PreVote within the election timeout of hearing from a current
-    // leader, it does not grants the pre-vote.
+    bool rejected = false;
+
+    // Reply false if last AppendEntries call was received less than election timeout ago.
     if (currentLeader_ != 0 && electionElapsed_ < randomizedElectionTimeout_) {
-      LOG(INFO) << fmt::format(
-          "{:x} [logterm: {:d}, index: {:d}, vote: {:x}] ignored {:s} from {:x} [logterm: "
-          "{:d}, index: {:d}] at term {:d}: lease is not expired (remaining ticks: {:d})",
-          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
-          m.from(), m.logterm(), m.index(), currentTerm_,
-          randomizedElectionTimeout_ - electionElapsed_);
-      return;
+      rejected = true;
     }
 
-    bool reject = true;
-    if (m.term() > currentTerm_ && log_->IsUpToDate(m.index(), m.logterm())) {
-      reject = false;
+    // Reply false if term < currentTerm
+    if (m.term() < currentTerm_) {
+      rejected = true;
     }
-    sendVoteResp(m, reject);
+
+    // If votedFor is null or candidateId, and candidate's log
+    // is at least as up­to­date as receiver's log, grant vote
+    if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
+    } else {
+      rejected = true;
+    }
+
+    if (rejected) {
+      LOG(INFO) << fmt::format(
+          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] rejected {:s} from {:x} [logterm: "
+          "{:d}, index: {:d}] at term {:d}",
+          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+          m.from(), m.logterm(), m.index(), currentTerm_);
+    } else {
+      LOG(INFO) << fmt::format(
+          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
+          "index: {:d}] at term {:d}",
+          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+          m.from(), m.logterm(), m.index(), currentTerm_);
+    }
+    sendVoteResp(m, rejected);
   }
 
   void handleMsgVote(const pb::Message& m) {
@@ -424,13 +440,6 @@ class Raft : public StateMachine {
   }
 
   void sendVoteResp(const pb::Message& m, bool reject) {
-    LOG(INFO) << fmt::format(
-        "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
-        "index: "
-        "{:d}] at term {:d}",
-        id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
-        m.from(), m.logterm(), m.index(), currentTerm_);
-
     // send() will include term=currentTerm into message.
     send(PBMessage().Reject(reject).To(m.from()).Type(voteRespType(m.type())).v);
   }

@@ -108,7 +108,7 @@ struct Network {
       }
 
       // Leave if the election doesn't progress.
-      if (Peer(cand)->role_ == Raft::kPreCandidate) {
+      if (Peer(cand)->role_ != Raft::kCandidate) {
         return;
       }
     }

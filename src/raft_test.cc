@@ -17,8 +17,6 @@
 #include "memory_storage.h"
 #include "test_utils.h"
 
-#include <gtest/gtest.h>
-
 namespace yaraft {
 
 class RaftTest {
@@ -353,6 +351,29 @@ class RaftTest {
     ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
   }
 
+  static void TestDuelingPreCandidates() {
+    std::unique_ptr<Network> n(Network::New(3));
+    n->SetPreVote(true);
+    n->Cut(1, 3);
+
+    // 1 becomes leader since it receives votes from 1 and 2
+    n->RaiseElection(1);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+
+    // 3 campaigns then reverts to follower when its PreVote is rejected
+    n->RaiseElection(3);
+    ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
+
+    n->Restore(1, 3);
+
+    // Candidate 3 now increases its term and tries to vote again.
+    // With PreVote, it does not disrupt the leader.
+    n->RaiseElection(3);
+    ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+    ASSERT_EQ(n->Peer(2)->role_, Raft::kFollower);
+    ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
+  }
+
   // TestVoteFromAnyState ensures that no matter what state a node is from,
   // it will always step down and vote for a legal candidate.
   static void TestVoteFromAnyState(pb::MessageType type) {
@@ -478,6 +499,10 @@ TEST(Raft, CampaignWhileLeader) {
 
 TEST(Raft, DuelingCandidates) {
   RaftTest::TestDuelingCandidates();
+}
+
+TEST(Raft, DuelingPreCandidates) {
+  RaftTest::TestDuelingPreCandidates();
 }
 
 TEST(Raft, VoteFromAnyState) {
