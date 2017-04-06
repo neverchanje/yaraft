@@ -28,10 +28,11 @@ class Error {
     OutOfBound,
     InvalidConfig,
     LogCompacted,
-
-    // number of error codes
-    ErrorCodesNum
+    StepLocalMsg,
+    StepPeerNotFound,
   };
+
+  static constexpr uint64_t ErrorCodesNum = LogCompacted + 1;
 
  private:
   friend class silly::Status<Error, Error::ErrorCodes>;

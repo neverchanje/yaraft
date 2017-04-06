@@ -17,7 +17,7 @@
 
 #include <vector>
 
-#include "pb_helper.h"
+#include "fluent_pb.h"
 
 #include <boost/optional.hpp>
 #include <glog/logging.h>

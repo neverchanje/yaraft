@@ -22,3 +22,5 @@ ADD_YARAFT_TEST(raft_test)
 ADD_YARAFT_TEST(raft_paper_test)
 
 ADD_YARAFT_TEST(unstable_test)
+
+ADD_YARAFT_TEST(raw_node_test)
