@@ -175,6 +175,30 @@ To preserve the AppendEntries consistency, each of the MsgApp message should car
 two arguments `prevLogIndex`, which = `nextIndex - 1`, and `prevLogTerm`, which is the term
 of entry at `prevLogIndex`.
 
+## PreVote
+
+When a node is configured with PreVote mode, instead of immediately starting an election,
+it will first broadcast PreVote requests to all existing nodes. Each PreVote request includes
+a `nextTerm = caller.currentTerm + 1`. The receiver will not accept the request when nextTerm 
+is lower than its current term.
+(`Raft::campaign(kCampaignPreElection)`)
+
+In addition to the three basic states (`Raft::StateRole`), the PreVote mechanism introduces 
+a **PreCandidate** state. A node becomes PreCandidate when it starts a pre-election, in which
+it doesn't change anything except for its state.
+(`Raft::becomePreCandidate`)
+
+Servers will not accept the PreVote request unless it's confirmed to be partitioned from the
+current leader (`electionElapsed >= electionTimeout`). Moreover,
+the `lastLogIndex` and `lastLogTerm` carried by the request must be up-to-update enough,
+and `nextTerm` must have a larger value than `receiver.currentTerm`, 
+otherwise it will still be rejected.
+(`Raft::handleMsgPreVote`)
+
+If a majority of the nodes (including itself) responds that the leader appears to have failed,
+the node becomes a candidate and starts an election, otherwise it steps down as follower.
+(`Raft::handleMsgVoteResp`)
+
 ## Messages
 
 ### MsgAppResp
