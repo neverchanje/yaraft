@@ -23,10 +23,9 @@
 
 #include "conf.h"
 #include "exception.h"
-#include "pb_helper.h"
+#include "fluent_pb.h"
 #include "progress.h"
 #include "raft_log.h"
-#include "state_machine.h"
 
 #include <fmt/format.h>
 #include <glog/logging.h>
@@ -37,7 +36,7 @@ inline pb::MessageType voteRespType(pb::MessageType voteType) {
   return voteType == pb::MsgVote ? pb::MsgVoteResp : pb::MsgPreVoteResp;
 }
 
-class Raft : public StateMachine {
+class Raft {
   enum CampaignType {
     // kCampaignElection represents a normal (time-based) election (the second phase
     // of the election when Config.preVote is true).
@@ -84,7 +83,7 @@ class Raft : public StateMachine {
         log_->LastTerm());
   }
 
-  Status Step(pb::Message& m) override {
+  Status Step(pb::Message& m) {
     if (currentTerm_ > m.term()) {
       // ignore the message
       LOG(INFO) << fmt::format(
@@ -146,6 +145,25 @@ class Raft : public StateMachine {
 
   uint64_t Id() const {
     return id_;
+  }
+
+  void Tick() {
+    switch (role_) {
+      case kLeader:
+        tickHeartbeat();
+        break;
+      case kFollower:
+      case kCandidate:
+      case kPreCandidate:
+        tickElection();
+        break;
+      default:
+        break;
+    }
+  }
+
+  bool HasPeer(uint64_t id) {
+    return (prs_.find(id) != prs_.end());
   }
 
  private:
@@ -389,21 +407,6 @@ class Raft : public StateMachine {
   void loadState(pb::HardState state) {
     currentTerm_ = state.term();
     votedFor_ = state.vote();
-  }
-
-  void _tick() {
-    switch (role_) {
-      case kLeader:
-        tickHeartbeat();
-        break;
-      case kFollower:
-      case kCandidate:
-      case kPreCandidate:
-        tickElection();
-        break;
-      default:
-        break;
-    }
   }
 
   void tickHeartbeat() {

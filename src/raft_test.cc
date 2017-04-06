@@ -236,7 +236,7 @@ class RaftTest {
 
     for (auto t : tests) {
       t.network->SetPreVote(preVote);
-      t.network->RaiseElection(1);
+      t.network->StartElection(1);
 
       auto node = t.network->Peer(1);
 
@@ -259,7 +259,7 @@ class RaftTest {
     for (uint64_t cand = 1; cand <= 1; cand++) {
       std::unique_ptr<Network> n(Network::New(3));
       n->SetPreVote(preVote);
-      n->RaiseElection(cand);
+      n->StartElection(cand);
 
       for (uint64_t id = 1; id <= 3; id++) {
         ASSERT_EQ(n->Peer(id)->role_, cand == id ? Raft::kLeader : Raft::kFollower);
@@ -327,14 +327,14 @@ class RaftTest {
   static void TestDuelingCandidates() {
     std::unique_ptr<Network> n(Network::New(3));
     n->Cut(1, 3);
-    n->RaiseElection(1);
+    n->StartElection(1);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
     ASSERT_EQ(n->Peer(1)->log_->CommitIndex(), 1);
     ASSERT_EQ(n->Peer(2)->log_->LastIndex(), 1);
     ASSERT_EQ(n->Peer(3)->log_->LastIndex(), 0);
 
     // 3 stays as candidate since it receives a vote from 3 and a rejection from 2
-    n->RaiseElection(3);
+    n->StartElection(3);
     ASSERT_EQ(n->Peer(3)->role_, Raft::kCandidate);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
     ASSERT_EQ(n->Peer(2)->Term(), 1);
@@ -345,7 +345,7 @@ class RaftTest {
     // we expect it to disrupt the leader 1 since it has a higher term
     // 3 will be follower again since both 1 and 2 rejects its vote request
     // since 3 does not have a long enough log
-    n->RaiseElection(3);
+    n->StartElection(3);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kFollower);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kFollower);
     ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
@@ -357,18 +357,18 @@ class RaftTest {
     n->Cut(1, 3);
 
     // 1 becomes leader since it receives votes from 1 and 2
-    n->RaiseElection(1);
+    n->StartElection(1);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
 
     // 3 campaigns then reverts to follower when its PreVote is rejected
-    n->RaiseElection(3);
+    n->StartElection(3);
     ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
 
     n->Restore(1, 3);
 
     // Candidate 3 now increases its term and tries to vote again.
     // With PreVote, it does not disrupt the leader.
-    n->RaiseElection(3);
+    n->StartElection(3);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
     ASSERT_EQ(n->Peer(2)->role_, Raft::kFollower);
     ASSERT_EQ(n->Peer(3)->role_, Raft::kFollower);
@@ -421,20 +421,20 @@ class RaftTest {
 
   static void TestSingleNodeCandidate() {
     std::unique_ptr<Network> n(Network::New(1));
-    n->RaiseElection(1);
+    n->StartElection(1);
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
   }
 
   static void TestSingleNodePreCandidate() {
     std::unique_ptr<Network> n(Network::New(1));
-    n->RaiseElection(1);
+    n->StartElection(1);
     n->MutablePeerConfig(1)->preVote = true;
     ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
   }
 
   static void TestSingleNodeCommit() {
     std::unique_ptr<Network> n(Network::New(1));
-    n->RaiseElection(1);
+    n->StartElection(1);
     n->ReplicateAppend(1);
 
     n->Send(PBMessage().From(1).To(1).Type(pb::MsgProp).Entries({PBEntry().Data("somedata").v}).v);

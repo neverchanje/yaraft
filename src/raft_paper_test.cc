@@ -75,7 +75,7 @@ class RaftPaperTest {
     r->becomeLeader();
 
     for (int i = 0; i < heartbeatInterval; i++) {
-      r->_tick();
+      r->Tick();
     }
 
     ASSERT_EQ(r->mails_.size(), 2);
@@ -113,7 +113,7 @@ class RaftPaperTest {
     }
 
     for (int i = 1; i < 2 * electionTimeout; i++) {
-      r->_tick();
+      r->Tick();
     }
 
     ASSERT_EQ(r->currentTerm_, 2);
@@ -246,7 +246,7 @@ class RaftPaperTest {
       r->mails_.clear();
 
       for (int i = 0; i < r->c_->electionTick * 2 - 1; i++) {
-        r->_tick();
+        r->Tick();
       }
 
       ASSERT_EQ(r->mails_.size(), 2);
@@ -500,7 +500,7 @@ class RaftPaperTest {
     ASSERT_EQ(r->log_->CommitIndex(), li + 1);
 
     for (int i = 0; i < heartbeatTimeout; i++) {
-      r->_tick();
+      r->Tick();
     }
 
     ASSERT_EQ(r->mails_.size(), 2);

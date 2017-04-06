@@ -18,7 +18,7 @@
 #include <mutex>
 #include <vector>
 
-#include "pb_helper.h"
+#include "fluent_pb.h"
 #include "raftpb.pb.h"
 #include "status.h"
 #include "storage.h"

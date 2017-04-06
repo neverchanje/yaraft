@@ -17,10 +17,6 @@
 #include "raftpb.pb.h"
 #include "storage.h"
 
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
-
 namespace yaraft {
 
 // This file provides utilities to construct protobuf structs in fluent style.
@@ -139,20 +135,5 @@ struct PBHardState {
     return *this;
   }
 };
-
-// Print the message in a single line, useful for logging or other purposes.
-std::string DumpPB(const google::protobuf::Message& msg) {
-  std::string msgstr = msg.DebugString();
-  boost::trim(msgstr);
-
-  std::vector<std::string> tmp;
-  boost::split(tmp, msgstr, [](char c) { return c == '\n'; });
-  msgstr = boost::join(tmp, ", ");
-  return std::string("{") + msgstr + '}';
-}
-
-std::ostream& operator<<(std::ostream& os, const google::protobuf::Message& msg) {
-  return os << DumpPB(msg);
-}
 
 }  // namespace yaraft

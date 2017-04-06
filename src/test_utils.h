@@ -19,8 +19,8 @@
 
 #include "conf.h"
 #include "memory_storage.h"
+#include "pb_utils.h"
 #include "raft.h"
-#include "raftpb.pb.h"
 
 #include <gtest/gtest.h>
 
@@ -97,7 +97,7 @@ struct Network {
     return boost::none;
   }
 
-  void RaiseElection(uint64_t cand = 1) {
+  void StartElection(uint64_t cand = 1) {
     Send(PBMessage().From(cand).To(cand).Type(pb::MsgHup).v);
 
     if (Peer(cand)->c_->preVote) {
