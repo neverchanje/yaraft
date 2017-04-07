@@ -188,8 +188,6 @@ class RaftTest {
     raft->becomeCandidate();
     raft->becomeLeader();
 
-    ASSERT_EQ(raft->prs_[2].NextIndex(), 4);
-
     // A heartbeat response from a node that is behind; re-send MsgApp
     raft->Step(PBMessage().From(2).Type(pb::MsgHeartbeatResp).Term(1).v);
     ASSERT_EQ(raft->mails_.size(), 1);
@@ -445,6 +443,42 @@ class RaftTest {
 
     ASSERT_EQ(n->Peer(1)->log_->CommitIndex(), 3);
   }
+
+  static void TestLogReplication() {
+    {
+      std::unique_ptr<Network> n(Network::New(3));
+
+      n->StartElection(1);
+      ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+
+      n->Send(PBMessage().Type(pb::MsgProp).From(1).To(1).Entries({PBEntry().Data("data").v}).v);
+      n->ReplicateAppend(1);
+
+      for (uint64_t i = 1; i <= 3; i++) {
+        ASSERT_EQ(n->Peer(i)->log_->CommitIndex(), 2) << " " << i;
+      }
+    }
+
+    {
+      std::unique_ptr<Network> n(Network::New(3));
+
+      n->StartElection(1);
+      ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
+
+      n->Send(PBMessage().Type(pb::MsgProp).From(1).To(1).Entries({PBEntry().Data("data").v}).v);
+      n->ReplicateAppend(1);
+
+      n->StartElection(2);
+      ASSERT_EQ(n->Peer(2)->role_, Raft::kLeader);
+
+      n->Send(PBMessage().Type(pb::MsgProp).From(2).To(2).Entries({PBEntry().Data("data").v}).v);
+      n->ReplicateAppend(2);
+
+      for (uint64_t i = 1; i <= 3; i++) {
+        ASSERT_EQ(n->Peer(i)->log_->CommitIndex(), 4);
+      }
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -471,14 +505,16 @@ TEST(Raft, HandleHeartbeatResp) {
   RaftTest::TestHandleHeartbeatResp();
 }
 
-TEST(Raft, LogReplication) {}
-
 TEST(Raft, LeaderElection) {
   RaftTest::TestLeaderElection(false);
 }
 
 TEST(Raft, LeaderElectionPreVote) {
   RaftTest::TestLeaderElection(true);
+}
+
+TEST(Raft, LogReplication) {
+  RaftTest::TestLogReplication();
 }
 
 TEST(Raft, LeaderCycle) {

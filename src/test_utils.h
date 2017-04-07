@@ -130,6 +130,13 @@ struct Network {
         continue;
       TakeSingleRound(pb::MsgApp, lead, id);
     }
+
+    Send(PBMessage().From(lead).To(lead).Type(pb::MsgBeat).v);
+    for (uint64_t id = 1; id <= PeerSize(); id++) {
+      if (id == lead)
+        continue;
+      TakeSingleRound(pb::MsgHeartbeat, lead, id);
+    }
   }
 
   // Simulate a single round of request response.
@@ -138,7 +145,7 @@ struct Network {
     auto req = MustTake(from, to, type);
     if (cutMap_[from] != to && peers_.find(to) != peers_.end()) {
       Send(req);
-      auto resp = MustTake(to, from, responseType(type));
+      auto resp = MustTake(to, from, GetResponseType(type));
       Send(resp);
     }
   }
@@ -210,21 +217,6 @@ struct Network {
   void Restore(uint64_t n1, uint64_t n2) {
     cutMap_.erase(cutMap_.find(n1));
     cutMap_.erase(cutMap_.find(n2));
-  }
-
- private:
-  pb::MessageType responseType(pb::MessageType type) {
-    switch (type) {
-      case pb::MsgApp:
-        return pb::MsgAppResp;
-      case pb::MsgVote:
-        return pb::MsgVoteResp;
-      case pb::MsgPreVote:
-        return pb::MsgPreVoteResp;
-      default:
-        DLOG(FATAL) << "Error type: " << pb::MessageType_Name(type);
-        return pb::MessageType(0);
-    }
   }
 
  private:

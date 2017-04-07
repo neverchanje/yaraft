@@ -24,6 +24,7 @@
 #include "conf.h"
 #include "exception.h"
 #include "fluent_pb.h"
+#include "pb_utils.h"
 #include "progress.h"
 #include "raft_log.h"
 
@@ -215,8 +216,6 @@ class Raft {
     }
     prs_[id_].MatchIndex(log_->LastIndex());
 
-    appendRawEntries(PBMessage().Entries({PBEntry().Data(nullptr).v}).v);
-
     LOG(INFO) << id_ << " became leader at term " << currentTerm_;
   }
 
@@ -235,16 +234,12 @@ class Raft {
     DLOG_ASSERT(prs_.find(m.from()) != prs_.end())
         << fmt::format("{:x} no progress available for {:x}", id_, m.from());
 
-    auto& pr = prs_[m.from()];
-
     switch (m.type()) {
       case pb::MsgAppResp:
         handleMsgAppResp(m);
         break;
       case pb::MsgHeartbeatResp:
-        if (pr.MatchIndex() < log_->LastIndex()) {
-          sendAppend(m.from());
-        }
+        handleMsgHeartbeatResp(m);
         break;
       default:
         // ignore unexpected messages
@@ -331,6 +326,7 @@ class Raft {
     if (gr >= quorum()) {
       if (m.type() == pb::MsgVoteResp) {
         becomeLeader();
+        appendRawEntries(PBMessage().Entries({PBEntry().Data(nullptr).v}).v);
         bcastAppend();
       } else {
         voteGranted_.clear();
@@ -382,8 +378,10 @@ class Raft {
   void stepFollower(pb::Message& m) {
     switch (m.type()) {
       case pb::MsgApp:
-        currentLeader_ = m.from();
         handleAppendEntries(m);
+        break;
+      case pb::MsgHeartbeat:
+        handleHeartbeat(m);
         break;
     }
   }
@@ -506,7 +504,12 @@ class Raft {
     send(m.v);
   }
 
-  void handleMsgHeartbeatResp(const pb::Message& m) {}
+  void handleMsgHeartbeatResp(const pb::Message& m) {
+    auto& pr = prs_[m.from()];
+    if (pr.MatchIndex() < log_->LastIndex()) {
+      sendAppend(m.from());
+    }
+  }
 
   void handleMsgAppResp(const pb::Message& m) {
     auto& pr = prs_[m.from()];
@@ -528,8 +531,21 @@ class Raft {
     }
   }
 
+  void handleHeartbeat(const pb::Message& m) {
+    DLOG_ASSERT(role_ != StateRole::kLeader);
+
+    currentLeader_ = m.from();
+    electionElapsed_ = 0;
+
+    log_->CommitTo(m.commit());
+    send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).v);
+  }
+
   void handleAppendEntries(pb::Message& m) {
-    DLOG_ASSERT(role_ == StateRole::kFollower);
+    DLOG_ASSERT(role_ != StateRole::kLeader);
+
+    currentLeader_ = m.from();
+    electionElapsed_ = 0;
 
     PBMessage msg;
     msg.To(m.from()).Type(pb::MsgAppResp);
@@ -577,13 +593,6 @@ class Raft {
     if (log_->ZeroTermOnErrCompacted(to) == currentTerm_) {
       log_->CommitTo(to);
     }
-  }
-
-  void handleHeartbeat(const pb::Message& m) {
-    DLOG_ASSERT(role_ == StateRole::kFollower);
-
-    log_->CommitTo(m.commit());
-    send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).v);
   }
 
   void campaign(CampaignType type) {

@@ -199,7 +199,9 @@ class RaftLog {
   // Returns a slice of log entries from lo through hi-1, inclusive.
   // FirstIndex <= lo < hi <= LastIndex + 1
   StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) {
-    LOG_ASSERT(lo < hi);
+    if (lo > hi) {
+      return EntryVec();
+    }
 
     uint64_t fi = FirstIndex(), li = LastIndex();
     if (lo < fi)

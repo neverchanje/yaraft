@@ -19,8 +19,6 @@
 #include "raft.h"
 #include "test_utils.h"
 
-#include <gtest/gtest.h>
-
 namespace yaraft {
 
 class RaftPaperTest {
@@ -196,8 +194,7 @@ class RaftPaperTest {
       // become leader at term 3
       r->becomeCandidate();
       r->becomeLeader();
-      r->mails_.clear();
-      ASSERT_EQ(r->prs_[1].MatchIndex(), 3);  // includes empty entry appended by new leader
+      ASSERT_EQ(r->prs_[1].MatchIndex(), 2);
       ASSERT_EQ(r->currentTerm_, 3);
 
       // append a empty entry with index = 3
@@ -208,7 +205,7 @@ class RaftPaperTest {
                   .Term(r->currentTerm_)
                   .Entries({pb::Entry()})
                   .v);
-      ASSERT_EQ(r->prs_[1].MatchIndex(), 4);
+      ASSERT_EQ(r->prs_[1].MatchIndex(), 3);
 
       r->Step(
           PBMessage().From(2).To(1).Type(pb::MsgAppResp).Term(r->currentTerm_).Index(t.index).v);
@@ -348,9 +345,7 @@ class RaftPaperTest {
 
       uint64_t lastIdx = r->c_->storage->LastIndex().GetValue();
       EntryVec expect = t.ents;
-      expect.push_back(
-          PBEntry().Term(3).Index(lastIdx + 1).v);  // empty log appended when leader elected
-      expect.push_back(PBEntry().Term(3).Index(lastIdx + 2).Data("some data").v);
+      expect.push_back(PBEntry().Term(3).Index(lastIdx + 1).Data("some data").v);
 
       EntryVec actual = t.ents;
       EntryVec& unstable = r->log_->TEST_Unstable().entries;

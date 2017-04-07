@@ -19,6 +19,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <glog/logging.h>
 
 namespace yaraft {
 
@@ -31,9 +32,26 @@ bool IsResponseMsg(pb::Message& m) {
     case pb::MsgAppResp:
     case pb::MsgVoteResp:
     case pb::MsgPreVoteResp:
+    case pb::MsgHeartbeatResp:
       return true;
     default:
       return false;
+  }
+}
+
+pb::MessageType GetResponseType(pb::MessageType type) {
+  switch (type) {
+    case pb::MsgApp:
+      return pb::MsgAppResp;
+    case pb::MsgVote:
+      return pb::MsgVoteResp;
+    case pb::MsgPreVote:
+      return pb::MsgPreVoteResp;
+    case pb::MsgHeartbeat:
+      return pb::MsgHeartbeatResp;
+    default:
+      DLOG(FATAL) << pb::MessageType_Name(type) << "is not a request type";
+      return pb::MessageType(0);
   }
 }
 
