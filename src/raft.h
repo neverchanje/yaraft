@@ -225,7 +225,7 @@ class Raft {
         bcastHeartbeat();
         return;
       case pb::MsgProp:
-        handleLeaderMsgProp(m);
+        handleMsgPropLeader(m);
         return;
       default:
         break;
@@ -370,6 +370,10 @@ class Raft {
         handleHeartbeat(m);
         break;
 
+      case pb::MsgProp:
+        handleMsgPropCandidate(m);
+        break;
+
       default:
         break;
     }
@@ -382,6 +386,9 @@ class Raft {
         break;
       case pb::MsgHeartbeat:
         handleHeartbeat(m);
+        break;
+      case pb::MsgProp:
+        handleMsgPropFollower(m);
         break;
     }
   }
@@ -560,9 +567,24 @@ class Raft {
     }
   }
 
-  void handleLeaderMsgProp(pb::Message& m) {
+  void handleMsgPropLeader(pb::Message& m) {
     appendRawEntries(m);
     bcastAppend();
+  }
+
+  void handleMsgPropFollower(pb::Message& m) {
+    if (currentLeader_ == 0) {
+      LOG(INFO) << fmt::format("{:x} no leader at term {:d}; dropping proposal", id_, currentTerm_);
+      return;
+    }
+    m.set_to(currentLeader_);
+    m.set_term(0);
+    send(m);
+  };
+
+  void handleMsgPropCandidate(const pb::Message& m) {
+    LOG(INFO) << fmt::format("{:x} no leader at term {:d}; dropping proposal", id_, currentTerm_);
+    return;
   }
 
   void appendRawEntries(pb::Message& m) {

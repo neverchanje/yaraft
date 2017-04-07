@@ -479,6 +479,35 @@ class RaftTest {
       }
     }
   }
+
+  static void TestProposalByProxy() {
+    struct TestData {
+      Network *network;
+    } tests[] = {{Network::New(3)}, {Network::New(3)->Down(3)}};
+    for (auto t : tests) {
+      std::unique_ptr<Network> n(t.network);
+
+      // index = 1
+      n->StartElection(1);
+
+      n->Send(
+          PBMessage().From(2).To(2).Type(pb::MsgProp).Entries({PBEntry().Data("some data").v}).v);
+      auto prop = n->MustTake(2, 1, pb::MsgProp);
+      n->Send(prop);
+
+      // index = 2
+      n->ReplicateAppend(1);
+
+      for (auto r : n->Peers()) {
+        ASSERT_EQ(r->log_->CommitIndex(), 2);
+
+        auto ev = r->log_->AllEntries();
+        ASSERT_TRUE(ev[0] == PBEntry().Term(1).Index(1).v);
+        ASSERT_TRUE(ev[1] == PBEntry().Term(1).Index(2).Data("some data").v);
+        ASSERT_EQ(ev.size(), 2);
+      }
+    }
+  }
 };
 
 }  // namespace yaraft
@@ -559,4 +588,8 @@ TEST(Raft, SingleNodePreCandidate) {
 
 TEST(Raft, SingleNodeCommit) {
   RaftTest::TestSingleNodeCommit();
+}
+
+TEST(Raft, ProposalByProxy) {
+  RaftTest::TestProposalByProxy();
 }

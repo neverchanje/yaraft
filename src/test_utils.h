@@ -179,6 +179,14 @@ struct Network {
     return peers_[id];
   }
 
+  std::vector<Raft*> Peers() {
+    std::vector<Raft*> prs;
+    for (auto& e : peers_) {
+      prs.push_back(e.second);
+    }
+    return prs;
+  }
+
   Config* MutablePeerConfig(uint64_t id) {
     return const_cast<Config*>(peers_[id]->c_.get());
   }
