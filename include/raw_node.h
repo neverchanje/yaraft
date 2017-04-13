@@ -14,42 +14,26 @@
 
 #pragma once
 
-#include <memory>
-
-#include "pb_utils.h"
-#include "raft.h"
+#include "raftpb.pb.h"
+#include "status.h"
 
 namespace yaraft {
 
+class Raft;
+class Config;
+
 class RawNode {
  public:
-  explicit RawNode(Config* conf) : raft_(new Raft(conf)) {}
+  explicit RawNode(Config *conf);
 
   // Tick advances the internal logical clock by a single tick.
-  void Tick() {
-    raft_->Tick();
-  }
+  void Tick();
 
   // Step advances the state machine using the given message.
-  Status Step(pb::Message& m) {
-    // ignore unexpected local messages receiving over network
-    if (IsLocalMsg(m)) {
-      return Status::Make(Error::StepLocalMsg, "cannot step raft local message");
-    }
-
-    if (!raft_->HasPeer(m.from()) && IsResponseMsg(m)) {
-      return Status::Make(Error::StepPeerNotFound,
-                          "cannot step a response message from peer not found");
-    }
-
-    return raft_->Step(m);
-  }
+  Status Step(pb::Message &m);
 
   // Campaign causes this RawNode to transition to candidate state.
-  Status Campaign() {
-    uint64_t id = raft_->Id(), term = raft_->Term();
-    return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgHup).Term(term).v);
-  }
+  Status Campaign();
 
  private:
   std::unique_ptr<Raft> raft_;

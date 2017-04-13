@@ -23,11 +23,11 @@
 
 namespace yaraft {
 
-bool IsLocalMsg(pb::Message& m) {
+inline bool IsLocalMsg(pb::Message& m) {
   return m.from() == m.to();
 }
 
-bool IsResponseMsg(pb::Message& m) {
+inline bool IsResponseMsg(pb::Message& m) {
   switch (m.type()) {
     case pb::MsgAppResp:
     case pb::MsgVoteResp:
@@ -39,7 +39,7 @@ bool IsResponseMsg(pb::Message& m) {
   }
 }
 
-pb::MessageType GetResponseType(pb::MessageType type) {
+inline pb::MessageType GetResponseType(pb::MessageType type) {
   switch (type) {
     case pb::MsgApp:
       return pb::MsgAppResp;
@@ -56,7 +56,7 @@ pb::MessageType GetResponseType(pb::MessageType type) {
 }
 
 // Print the message in a single line, useful for logging or other purposes.
-std::string DumpPB(const google::protobuf::Message& msg) {
+inline std::string DumpPB(const google::protobuf::Message& msg) {
   std::string msgstr = msg.DebugString();
   boost::trim(msgstr);
 
@@ -66,7 +66,7 @@ std::string DumpPB(const google::protobuf::Message& msg) {
   return std::string("{") + msgstr + '}';
 }
 
-std::ostream& operator<<(std::ostream& os, const google::protobuf::Message& msg) {
+inline std::ostream& operator<<(std::ostream& os, const google::protobuf::Message& msg) {
   return os << DumpPB(msg);
 }
 

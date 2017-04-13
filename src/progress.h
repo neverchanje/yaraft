@@ -128,7 +128,7 @@ class Progress {
   Inflights ins_;
 };
 
-std::ostream& operator<<(std::ostream& os, const Progress& p) {
+inline std::ostream& operator<<(std::ostream& os, const Progress& p) {
   os << p.ToString();
   return os;
 }

@@ -15,8 +15,6 @@
 #include "raw_node.h"
 #include "test_utils.h"
 
-#include <gtest/gtest.h>
-
 using namespace yaraft;
 
 // This test ensures that RawNode.Step ignore local message.
