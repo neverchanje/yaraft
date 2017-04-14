@@ -3,6 +3,7 @@
 BUILD_DIR=`pwd`/build
 TP_DIR="`pwd`/third_parties"
 TP_BUILD_DIR="$BUILD_DIR/third_parties"
+TP_STAMP_DIR="$TP_BUILD_DIR/stamp"
 PROTO_FILES_DIR=`pwd`/pb
 
 PROTOBUF_VERSION=2.6.1
@@ -26,6 +27,10 @@ SILLY_NAME=silly-$SILLY_VERSION
 SILLY_SOURCE=$TP_DIR/$SILLY_NAME
 
 QINIU_CDN_URL_PREFIX=http://onnzg1pyx.bkt.clouddn.com
+
+make_stamp() {
+  touch $TP_STAMP_DIR/$1
+}
 
 fetch_and_expand() {
   local FILENAME=$1

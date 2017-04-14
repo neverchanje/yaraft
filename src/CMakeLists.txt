@@ -4,9 +4,12 @@ set(YARAFT_TEST_LINK_LIBS
         ${FMT_LIBRARY}
         ${GLOG_STATIC_LIB})
 
+file(GLOB LIBYARAFT_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h")
 set(YARAFT_SRC ${PROJECT_SOURCE_DIR}/src/raw_node.cc)
 add_library(yaraft ${YARAFT_SRC})
 target_link_libraries(yaraft ${YARAFT_TEST_LINK_LIBS})
+install(TARGETS yaraft DESTINATION lib)
+install(FILES ${LIBYARAFT_HEADERS} DESTINATION include/yaraft)
 
 set(YARAFT_TEST_LINK_LIBS ${YARAFT_TEST_LINK_LIBS} yaraft)
 
