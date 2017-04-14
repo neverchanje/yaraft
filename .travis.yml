@@ -12,7 +12,7 @@ branches:
 install:
 - sudo apt update
 - sudo apt-get -y install libboost-dev
-- bash install_deps_if_neccessary.sh
+- bash install_deps_if_necessary.sh
 
 script:
 - cd build && cmake .. && make
