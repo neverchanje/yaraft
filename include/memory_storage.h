@@ -23,7 +23,6 @@
 #include "status.h"
 #include "storage.h"
 
-#include <glog/logging.h>
 #include <silly/disallow_copying.h>
 
 namespace yaraft {
@@ -37,21 +36,7 @@ class MemoryStorage : public Storage {
   __DISALLOW_COPYING__(MemoryStorage);
 
  public:
-  virtual StatusWith<uint64_t> Term(uint64_t i) const override {
-    std::lock_guard<std::mutex> guard(mu_);
-
-    auto beginIndex = entries_.begin()->index();
-
-    if (i < beginIndex) {
-      return Status::Make(Error::LogCompacted);
-    }
-
-    if (i > entries_.rbegin()->index()) {
-      return Status::Make(Error::OutOfBound);
-    }
-
-    return StatusWith<uint64_t>(entries_[i - beginIndex].term());
-  }
+  virtual StatusWith<uint64_t> Term(uint64_t i) const override;
 
   virtual StatusWith<uint64_t> FirstIndex() const override {
     std::lock_guard<std::mutex> guard(mu_);
@@ -63,39 +48,7 @@ class MemoryStorage : public Storage {
     return lastIndex();
   }
 
-  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t *maxSize) override {
-    DLOG_ASSERT(lo <= hi);
-
-    std::lock_guard<std::mutex> guard(mu_);
-    if (lo <= entries_.begin()->index()) {
-      return Status::Make(Error::LogCompacted);
-    }
-
-    LOG_ASSERT(hi - 1 <= entries_.rbegin()->index());
-
-    if (entries_.size() == 1) {
-      // contains only a dummy entry
-      return Status::Make(Error::OutOfBound);
-    }
-
-    uint64_t loOffset = lo - entries_.begin()->index();
-    int size = entries_[loOffset].ByteSize();
-
-    std::vector<pb::Entry> ret;
-    ret.push_back(entries_[loOffset]);
-
-    for (int i = 1; i < hi - lo; i++) {
-      auto &e = entries_[i + loOffset];
-      size += e.ByteSize();
-      if (size > *maxSize) {
-        size -= e.ByteSize();
-        break;
-      }
-      ret.push_back(e);
-    }
-    *maxSize -= size;
-    return ret;
-  }
+  virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t *maxSize) override;
 
   virtual StatusWith<pb::Snapshot> Snapshot() const override {
     std::lock_guard<std::mutex> guard(mu_);
@@ -122,28 +75,7 @@ class MemoryStorage : public Storage {
   // Compact discards all log entries prior to compactIndex.
   // It is the application's responsibility to not attempt to compact an index
   // greater than raftLog.applied.
-  Status Compact(uint64_t compactIndex) {
-    uint64_t beginIndex = entries_.begin()->index();
-    if (compactIndex <= beginIndex) {
-      return Status::Make(Error::LogCompacted);
-    }
-    LOG_ASSERT(compactIndex <= entries_.rbegin()->index());
-
-    size_t compactOffset = compactIndex - beginIndex;
-
-    pb::Entry tmp;
-    tmp.set_term(entries_[compactOffset].term());
-    tmp.set_index(entries_[compactOffset].index());
-    entries_[0].Swap(&tmp);
-
-    size_t l = 1;
-    for (size_t i = compactOffset + 1; i < entries_.size(); i++) {
-      entries_[l++].Swap(&entries_[i]);
-    }
-
-    entries_.resize(l);
-    return Status::OK();
-  }
+  Status Compact(uint64_t compactIndex);
 
   // SetHardState saves the current HardState.
   void SetHardState(pb::HardState st) {
@@ -193,23 +125,7 @@ class MemoryStorage : public Storage {
     return entries_.rbegin()->index();
   }
 
-  void unsafeAppend(pb::Entry &entry) {
-    auto first = firstIndex();
-    auto last = lastIndex();
-    auto index = entry.index();
-    if (index < first)
-      return;
-    if (index > last) {
-      // ensures the entries are continuous.
-      DLOG_ASSERT(index - last == 1);
-      entries_.push_back(std::move(entry));
-      return;
-    }
-
-    // replace the old record if overlapped.
-    auto offset = entry.index() - entries_.begin()->index();
-    entries_[offset] = std::move(entry);
-  }
+  void unsafeAppend(pb::Entry &entry);
 
  public:
   /// The following functions are for test only.

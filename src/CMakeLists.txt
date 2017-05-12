@@ -4,17 +4,18 @@ set(YARAFT_TEST_LINK_LIBS
         ${FMT_LIBRARY}
         ${GLOG_STATIC_LIB})
 
-file(GLOB LIBYARAFT_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h")
-set(YARAFT_SRC ${PROJECT_SOURCE_DIR}/src/raw_node.cc)
-add_library(yaraft ${YARAFT_SRC})
+file(GLOB LIBYARAFT_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h" "${PROJECT_SOURCE_DIR}/pb/*.h")
+file(GLOB LIBYARAFT_CPP "${PROJECT_SOURCE_DIR}/src/*.cc" "${PROJECT_SOURCE_DIR}/pb/*.cc")
+add_library(yaraft ${LIBYARAFT_CPP})
 target_link_libraries(yaraft ${YARAFT_TEST_LINK_LIBS})
+
 install(TARGETS yaraft DESTINATION lib)
 install(FILES ${LIBYARAFT_HEADERS} DESTINATION include/yaraft)
 
 set(YARAFT_TEST_LINK_LIBS ${YARAFT_TEST_LINK_LIBS} yaraft)
 
 function(ADD_YARAFT_TEST TEST_NAME)
-    add_executable(${TEST_NAME} ${TEST_NAME}.cc ${PROJECT_SOURCE_DIR}/pb/raftpb.pb.cc)
+    add_executable(${TEST_NAME} ${TEST_NAME}.cc)
     target_link_libraries(${TEST_NAME} ${YARAFT_TEST_LINK_LIBS})
 endfunction()
 
