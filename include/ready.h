@@ -23,27 +23,27 @@ namespace yaraft {
 // be saved to stable storage, committed or sent to other peers.
 // All fields in Ready are read-only.
 struct Ready {
-	// The current state of a Node to be saved to stable storage BEFORE
-	// Messages are sent.
-	// hardState will be equal to empty state if there is no update.
-	std::unique_ptr<pb::HardState> hardState;
+  // The current state of a Node to be saved to stable storage BEFORE
+  // Messages are sent.
+  // hardState will be equal to empty state if there is no update.
+  std::unique_ptr<pb::HardState> hardState;
 
-	// Entries specifies entries to be saved to stable storage BEFORE
-	// Messages are sent.
-	EntryVec entries;
+  // Entries specifies entries to be saved to stable storage BEFORE
+  // Messages are sent.
+  EntryVec entries;
 
-	// Snapshot specifies the snapshot to be saved to stable storage.
-	std::unique_ptr<pb::Snapshot> snapshot;
+  // Snapshot specifies the snapshot to be saved to stable storage.
+  std::unique_ptr<pb::Snapshot> snapshot;
 
-	// Messages specifies outbound messages to be sent AFTER Entries are
-	// committed to stable storage.
-	// If it contains a MsgSnap message, the application MUST report back to raft
-	// when the snapshot has been received or has failed by calling ReportSnapshot.
-	std::vector<pb::Message> messages;
+  // Messages specifies outbound messages to be sent AFTER Entries are
+  // committed to stable storage.
+  // If it contains a MsgSnap message, the application MUST report back to raft
+  // when the snapshot has been received or has failed by calling ReportSnapshot.
+  std::vector<pb::Message> messages;
 };
 
 inline bool IsReadyEmpty(const Ready& rd) {
-	return (!rd.hardState) && rd.entries.empty() && (!rd.snapshot) && rd.messages.empty();
+  return (!rd.hardState) && rd.entries.empty() && (!rd.snapshot) && rd.messages.empty();
 }
 
-} // namespace yaraft
+}  // namespace yaraft

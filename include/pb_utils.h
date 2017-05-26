@@ -19,14 +19,14 @@
 #include <yaraft/pb/raftpb.pb.h>
 
 namespace yaraft {
-  
+
 typedef std::vector<pb::Entry> EntryVec;
 
-inline bool IsLocalMsg(pb::Message& m) {
+inline bool IsLocalMsg(const pb::Message& m) {
   return m.from() == m.to();
 }
 
-inline bool IsResponseMsg(pb::Message& m) {
+inline bool IsResponseMsg(const pb::Message& m) {
   switch (m.type()) {
     case pb::MsgAppResp:
     case pb::MsgVoteResp:
