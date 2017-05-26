@@ -14,11 +14,25 @@
 
 #include "raw_node.h"
 #include "conf.h"
+#include "fluent_pb.h"
 #include "raft.h"
+#include "ready.h"
 
 namespace yaraft {
 
+bool operator==(const pb::HardState& a, const pb::HardState& b) {
+  return a.term() == b.term() && a.vote() == b.vote();
+}
+
+bool operator!=(const pb::HardState& a, const pb::HardState& b) {
+  return !(a == b);
+}
+
 RawNode::RawNode(Config* conf) : raft_(new Raft(conf)) {}
+
+RawNode::~RawNode() {
+  delete raft_;
+}
 
 void RawNode::Tick() {
   raft_->Tick();
@@ -41,6 +55,20 @@ Status RawNode::Step(pb::Message& m) {
 Status RawNode::Campaign() {
   uint64_t id = raft_->Id(), term = raft_->Term();
   return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgHup).Term(term).v);
+}
+
+Ready* RawNode::GetReady() {
+  auto rd = new Ready;
+  rd->entries = std::move(raft_->log_->GetUnstable().entries);
+  rd->messages = std::move(raft_->mails_);
+
+  pb::HardState hs = PBHardState().Vote(raft_->votedFor_).Term(raft_->currentTerm_).v;
+  if (!prevHardState_ || (*prevHardState_) != hs) {
+    rd->hardState.reset(new pb::HardState(hs));
+  }
+  (*prevHardState_) = std::move(hs);
+
+  return rd;
 }
 
 }  // namespace yaraft
