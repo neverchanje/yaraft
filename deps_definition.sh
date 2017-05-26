@@ -22,7 +22,7 @@ FMT_VERSION=3.0.1
 FMT_NAME=fmt-$FMT_VERSION
 FMT_SOURCE=$TP_DIR/$FMT_NAME
 
-SILLY_VERSION=0.0.1-alpha-0
+SILLY_VERSION=0.0.1-alpha-1
 SILLY_NAME=silly-$SILLY_VERSION
 SILLY_SOURCE=$TP_DIR/$SILLY_NAME
 
@@ -52,7 +52,7 @@ fetch_and_expand() {
       echo "Archive $FILENAME already exists. Not re-downloading archive."
     else
       echo "Fetching $FILENAME from $FULL_URL"
-      curl -L -O "$FULL_URL"
+      wget "$FULL_URL"
     fi
 
     echo "Unpacking $FILENAME"
@@ -92,36 +92,36 @@ fetch_and_expand() {
 }
 
 build_glog() {
-    echo "Installing glog..."
-    pushd ${GLOG_SOURCE}
+  echo "Installing glog..."
+  pushd ${GLOG_SOURCE}
 	./configure --prefix=${TP_BUILD_DIR} --disable-shared
 	make -j4 && make install
 	popd
 }
 
 build_silly() {
-    echo "Installing silly..."
-    pushd ${SILLY_SOURCE}
+  echo "Installing silly..."
+  pushd ${SILLY_SOURCE}
 	mkdir -p build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DLITE_VERSION=true
+  cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DLITE_VERSION=true
 	make && make install
 	popd
 }
 
 build_protobuf() {
-    echo "Installing protobuf..."
-    pushd ${PROTOBUF_SOURCE}
+  echo "Installing protobuf..."
+  pushd ${PROTOBUF_SOURCE}
 	autoreconf -ivf
-    ./configure --prefix=${TP_BUILD_DIR} --disable-shared
+  ./configure --prefix=${TP_BUILD_DIR} --disable-shared
 	make -j4 && make install
 	popd
 }
 
 build_fmtlib() {
-    echo "Installing fmtlib..."
-    pushd ${FMT_SOURCE}
+  echo "Installing fmtlib..."
+  pushd ${FMT_SOURCE}
 	mkdir -p build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DFMT_TEST=false
+  cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DFMT_TEST=false
 	make -j4 && make install
 	popd
 }
