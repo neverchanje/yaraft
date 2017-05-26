@@ -14,17 +14,21 @@
 
 #pragma once
 
-#include "raftpb.pb.h"
 #include "status.h"
+
+#include <yaraft/pb/raftpb.pb.h>
 
 namespace yaraft {
 
 class Raft;
 class Config;
+class Ready;
 
 class RawNode {
  public:
   explicit RawNode(Config *conf);
+
+  ~RawNode();
 
   // Tick advances the internal logical clock by a single tick.
   void Tick();
@@ -35,8 +39,16 @@ class RawNode {
   // Campaign causes this RawNode to transition to candidate state.
   Status Campaign();
 
+  // Ready returns the current point-in-time state of this RawNode.  
+  Ready *GetReady();
+
+  // Advance notifies the RawNode that the application has applied and saved progress in the
+  // last Ready results.
+  void Advance(const Ready& ready);
+
  private:
-  std::unique_ptr<Raft> raft_;
+  Raft* raft_;  
+  std::unique_ptr<pb::HardState> prevHardState_;
 };
 
 }  // namespace yaraft

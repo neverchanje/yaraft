@@ -18,12 +18,10 @@
 #include <cstdint>
 #include <vector>
 
-#include "raftpb.pb.h"
+#include "pb_utils.h"
 #include "status.h"
 
 namespace yaraft {
-
-typedef std::vector<pb::Entry> EntryVec;
 
 // Storage is an interface that may be implemented by the application
 // to retrieve log entries from storage.

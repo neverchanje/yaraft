@@ -14,8 +14,9 @@
 
 #pragma once
 
-#include "raftpb.pb.h"
 #include "storage.h"
+
+#include <yaraft/pb/raftpb.pb.h>
 
 namespace yaraft {
 

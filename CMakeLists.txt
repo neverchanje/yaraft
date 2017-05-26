@@ -37,12 +37,8 @@ message("-- Found ${FMT_LIBRARY}")
 
 include_directories(src)
 include_directories(include)
-include_directories(pb)
 include_directories(build/third_parties/include)
 include_directories(third_parties/googletest-1.8.0/googletest/include)
 
 add_subdirectory(src)
 add_subdirectory(third_parties/googletest-1.8.0/googletest)
-
-file(GLOB YARAFT_SOURCE "*/*.h" "*/*.cc")
-add_library(fuck_clion ${YARAFT_SOURCE})

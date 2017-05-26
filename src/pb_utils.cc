@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include "raftpb.pb.h"
+#include "pb_utils.h"
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -23,23 +21,7 @@
 
 namespace yaraft {
 
-inline bool IsLocalMsg(pb::Message& m) {
-  return m.from() == m.to();
-}
-
-inline bool IsResponseMsg(pb::Message& m) {
-  switch (m.type()) {
-    case pb::MsgAppResp:
-    case pb::MsgVoteResp:
-    case pb::MsgPreVoteResp:
-    case pb::MsgHeartbeatResp:
-      return true;
-    default:
-      return false;
-  }
-}
-
-inline pb::MessageType GetResponseType(pb::MessageType type) {
+pb::MessageType GetResponseType(pb::MessageType type) {
   switch (type) {
     case pb::MsgApp:
       return pb::MsgAppResp;
@@ -56,7 +38,7 @@ inline pb::MessageType GetResponseType(pb::MessageType type) {
 }
 
 // Print the message in a single line, useful for logging or other purposes.
-inline std::string DumpPB(const google::protobuf::Message& msg) {
+std::string DumpPB(const google::protobuf::Message& msg) {
   std::string msgstr = msg.DebugString();
   boost::trim(msgstr);
 
@@ -64,10 +46,6 @@ inline std::string DumpPB(const google::protobuf::Message& msg) {
   boost::split(tmp, msgstr, [](char c) { return c == '\n'; });
   msgstr = boost::join(tmp, ", ");
   return std::string("{") + msgstr + '}';
-}
-
-inline std::ostream& operator<<(std::ostream& os, const google::protobuf::Message& msg) {
-  return os << DumpPB(msg);
 }
 
 }  // namespace yaraft

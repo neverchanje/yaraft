@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "raftpb.pb.h"
+#include <yaraft/pb/raftpb.pb.h>
 
 namespace yaraft {
 

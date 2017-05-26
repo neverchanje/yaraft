@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "fluent_pb.h"
-#include "raftpb.pb.h"
+#include "pb_utils.h"
 #include "status.h"
 #include "storage.h"
 
@@ -84,6 +84,7 @@ class MemoryStorage : public Storage {
   }
 
   // Append the new entries to storage.
+  // Requires: The appending entries are continuos, otherwise Append will terminate the program.
   void Append(pb::Entry entry) {
     std::lock_guard<std::mutex> guard(mu_);
     unsafeAppend(entry);
