@@ -4,7 +4,7 @@ set -e
 
 source deps_definition.sh
 
-echo "Installing necessary dependencies for building..."
+echo "Installing necessary dependencies for building yaraft..."
 
 mkdir -p $TP_DIR
 mkdir -p $TP_STAMP_DIR
@@ -30,4 +30,4 @@ if [ ! -d $GTEST_SOURCE ]; then
     fetch_and_expand ${GTEST_NAME}.zip
 fi
 
-echo "Dependencies installation completed"
+echo "Dependencies installation of yaraft completed"
