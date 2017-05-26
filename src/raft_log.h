@@ -30,10 +30,6 @@ namespace yaraft {
 class RaftLog {
   __DISALLOW_COPYING__(RaftLog);
 
-  /// |<- firstIndex          lastIndex->|
-  /// |-- Storage---|----- Unstable -----|
-  /// |=============|====================|
-
  public:
   explicit RaftLog(Storage* storage) : storage_(storage), lastApplied_(0) {
     auto s = storage_->FirstIndex();
@@ -274,7 +270,7 @@ class RaftLog {
     return s.GetValue();
   }
 
-  Unstable& TEST_Unstable() {
+  Unstable& GetUnstable() {
     return unstable_;
   }
 

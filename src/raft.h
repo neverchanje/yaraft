@@ -163,7 +163,7 @@ class Raft {
     }
   }
 
-  bool HasPeer(uint64_t id) {
+  bool HasPeer(uint64_t id) const {
     return (prs_.find(id) != prs_.end());
   }
 
@@ -662,6 +662,7 @@ class Raft {
   friend class RaftTest;
   friend class RaftPaperTest;
   friend class Network;
+  friend class RawNode;
 
   uint64_t id_;
 

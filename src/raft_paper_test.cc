@@ -305,7 +305,7 @@ class RaftPaperTest {
                   .v);
 
       ASSERT_TRUE(r->log_->AllEntries() == t.wents);
-      ASSERT_TRUE(r->log_->TEST_Unstable().entries == t.wunstable);
+      ASSERT_TRUE(r->log_->GetUnstable().entries == t.wunstable);
     }
   }
 
@@ -348,7 +348,7 @@ class RaftPaperTest {
       expect.push_back(PBEntry().Term(3).Index(lastIdx + 1).Data("some data").v);
 
       EntryVec actual = t.ents;
-      EntryVec& unstable = r->log_->TEST_Unstable().entries;
+      EntryVec& unstable = r->log_->GetUnstable().entries;
       std::copy(unstable.begin(), unstable.end(), std::back_inserter(actual));
 
       std::cout << actual << expect;
@@ -440,7 +440,7 @@ class RaftPaperTest {
 
     // clean up noop entry generated when leader elected
     r->mails_.clear();
-    r->log_->TEST_Unstable().entries.clear();
+    r->log_->GetUnstable().entries.clear();
 
     auto ents = {PBEntry().Data("some data").v};
     uint64_t li = r->log_->LastIndex();
@@ -449,7 +449,7 @@ class RaftPaperTest {
     ASSERT_EQ(r->log_->CommitIndex(), li);
 
     auto wents = {PBEntry().Term(1).Index(li + 1).Data("some data").v};
-    ASSERT_TRUE(r->log_->TEST_Unstable().entries == wents);
+    ASSERT_TRUE(r->log_->GetUnstable().entries == wents);
 
     std::unordered_set<std::string> s1;
     std::for_each(r->mails_.begin(), r->mails_.end(),
@@ -479,7 +479,7 @@ class RaftPaperTest {
 
     // clean up noop entry generated when leader elected
     r->mails_.clear();
-    r->log_->TEST_Unstable().entries.clear();
+    r->log_->GetUnstable().entries.clear();
 
     uint64_t li = r->log_->LastIndex();
     auto ents = {PBEntry().Data("some data").v};
