@@ -288,14 +288,6 @@ inline bool operator==(EntryVec v1, EntryVec v2) {
   return true;
 }
 
-inline std::ostream& operator<<(std::ostream& os, const EntryVec& v) {
-  os << "Size of entry vec: " << v.size() << ". | ";
-  for (const auto& e : v) {
-    os << DumpPB(e) << " | ";
-  }
-  return os << "\n";
-}
-
 uint64_t mustTerm(const RaftLog& log, uint64_t index) {
   auto s = log.Term(index);
   return s.OK() ? s.GetValue() : 0;
