@@ -4,13 +4,17 @@ set(YARAFT_TEST_LINK_LIBS
         ${FMT_LIBRARY}
         ${GLOG_STATIC_LIB})
 
-file(GLOB LIBYARAFT_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h" "${PROJECT_SOURCE_DIR}/pb/*.h")
-file(GLOB LIBYARAFT_CPP "${PROJECT_SOURCE_DIR}/src/*.cc" "${PROJECT_SOURCE_DIR}/pb/*.cc")
+set(PROTO_DIR "${PROJECT_SOURCE_DIR}/src/yaraft/pb")
+
+file(GLOB LIBYARAFT_CPP "${PROJECT_SOURCE_DIR}/src/*.cc" "${PROTO_DIR}/*.cc")
 add_library(yaraft ${LIBYARAFT_CPP})
 target_link_libraries(yaraft ${YARAFT_TEST_LINK_LIBS})
 
+file(GLOB LIBYARAFT_INSTALL_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h")
+file(GLOB LIBYARAFT_INSTALL_PB "${PROTO_DIR}/*.h" "${PROTO_DIR}/*.proto")
 install(TARGETS yaraft DESTINATION lib)
-install(FILES ${LIBYARAFT_HEADERS} DESTINATION include/yaraft)
+install(FILES ${LIBYARAFT_INSTALL_HEADERS} DESTINATION include/yaraft)
+install(FILES ${LIBYARAFT_INSTALL_PB} DESTINATION include/yaraft/pb)
 
 set(YARAFT_TEST_LINK_LIBS ${YARAFT_TEST_LINK_LIBS} yaraft)
 
