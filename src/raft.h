@@ -37,6 +37,15 @@ inline pb::MessageType voteRespType(pb::MessageType voteType) {
   return voteType == pb::MsgVote ? pb::MsgVoteResp : pb::MsgPreVoteResp;
 }
 
+/// @brief Emit a fatal error if @c to_call returns a bad status.
+#define FATAL_NOT_OK(to_call, fatal_prefix)                  \
+  do {                                                       \
+    const auto& _s = (to_call);                              \
+    if (UNLIKELY(!_s.IsOK())) {                              \
+      LOG(FATAL) << (fatal_prefix) << ": " << _s.ToString(); \
+    }                                                        \
+  } while (0);
+
 class Raft {
   enum CampaignType {
     // kCampaignElection represents a normal (time-based) election (the second phase
@@ -53,7 +62,7 @@ class Raft {
 
   explicit Raft(Config* conf)
       : c_(conf), log_(new RaftLog(conf->storage)), electionElapsed_(0), votedFor_(0) {
-    LOG_ASSERT(conf->Validate());
+    FATAL_NOT_OK(conf->Validate(), "Config::Validate");
 
     id_ = conf->id;
     step_ = std::bind(&Raft::stepImpl, this, std::placeholders::_1);
@@ -358,7 +367,7 @@ class Raft {
           handleMsgVoteResp(m);
         break;
 
-      // If a candidate receives an AppendEntries RPC from another server claiming
+      // If a candidate receives an AppendEntries RPC from another rpc claiming
       // to be leader whose term is at least as large as the candidate's current term,
       // it recognizes the leader as legitimate and returns to follower state.
       case pb::MsgApp:
@@ -487,7 +496,7 @@ class Raft {
       uint64_t prevLogTerm = sTerm.GetValue();
 
       auto sEnts = log_->Entries(pr.NextIndex(), c_->maxSizePerMsg);
-      LOG_ASSERT(sEnts.OK());
+      FATAL_NOT_OK(sEnts.GetStatus(), "RaftLog::Entries");
       m.Entries(sEnts.GetValue());
 
       m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm).Commit(log_->CommitIndex());
