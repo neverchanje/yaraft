@@ -39,7 +39,8 @@ class RawNode {
   // Campaign causes this RawNode to transition to candidate state.
   Status Campaign();
 
-  // Ready returns the current point-in-time state of this RawNode.
+  // GetReady returns the current point-in-time state of this RawNode,
+  // and returns null when there's no state ready (to be persisted or transferred).
   Ready *GetReady();
 
   // Advance notifies the RawNode that the application has applied and saved progress in the
@@ -49,7 +50,9 @@ class RawNode {
   const Config *GetConfig() const;
 
  private:
+  // auto-deleted
   Raft *raft_;
+
   std::unique_ptr<pb::HardState> prevHardState_;
 };
 

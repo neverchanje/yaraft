@@ -58,7 +58,7 @@ Status RawNode::Campaign() {
 }
 
 Ready* RawNode::GetReady() {
-  auto rd = new Ready;
+  std::unique_ptr<Ready> rd(new Ready);
   rd->entries = std::move(raft_->log_->GetUnstable().entries);
   rd->messages = std::move(raft_->mails_);
 
@@ -68,7 +68,12 @@ Ready* RawNode::GetReady() {
   }
   (*prevHardState_) = std::move(hs);
 
-  return rd;
+  // return null if Ready is empty
+  if (rd->entries.empty() && rd->messages.empty() && !rd->hardState) {
+    return nullptr;
+  }
+
+  return rd.release();
 }
 
 }  // namespace yaraft
