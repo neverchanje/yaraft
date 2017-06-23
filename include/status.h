@@ -34,27 +34,14 @@ class Error {
 
   static constexpr uint64_t ErrorCodesNum = LogCompacted + 1;
 
+  static inline std::string ToString(unsigned int errorCode) {
+    return toString(errorCode);
+  }
+
  private:
   friend class silly::Status<Error, Error::ErrorCodes>;
 
-  static inline std::string toString(unsigned int errorCode) {
-#ifndef ERROR_CODE_DESCRIPT
-#define ERROR_CODE_DESCRIPT(err) \
-  case (err):                    \
-    return #err
-#endif
-    ErrorCodes code = static_cast<ErrorCodes>(errorCode);
-    switch (code) {
-      ERROR_CODE_DESCRIPT(OK);
-      ERROR_CODE_DESCRIPT(OutOfBound);
-      ERROR_CODE_DESCRIPT(InvalidConfig);
-      ERROR_CODE_DESCRIPT(LogCompacted);
-      default:
-        assert(false);
-        return "Unknown";
-    }
-#undef ERROR_CODE_DESCRIPT
-  }
+  static std::string toString(unsigned int errorCode);
 };
 
 typedef silly::Status<Error, Error::ErrorCodes> Status;
