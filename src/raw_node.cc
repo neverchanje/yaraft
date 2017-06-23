@@ -28,7 +28,7 @@ bool operator!=(const pb::HardState& a, const pb::HardState& b) {
   return !(a == b);
 }
 
-RawNode::RawNode(Config* conf) : raft_(new Raft(conf)) {}
+RawNode::RawNode(Config* conf) : raft_(new Raft(conf)), prevHardState_(new pb::HardState) {}
 
 RawNode::~RawNode() {
   delete raft_;
@@ -44,7 +44,7 @@ Status RawNode::Step(pb::Message& m) {
     return Status::Make(Error::StepLocalMsg, "cannot step raft local message");
   }
 
-  if (!raft_->HasPeer(m.from()) && IsResponseMsg(m)) {
+  if (!raft_->HasPeer(m.from())) {
     return Status::Make(Error::StepPeerNotFound,
                         "cannot step a response message from peer not found");
   }
@@ -63,13 +63,13 @@ Ready* RawNode::GetReady() {
   rd->messages = std::move(raft_->mails_);
 
   pb::HardState hs = PBHardState().Vote(raft_->votedFor_).Term(raft_->currentTerm_).v;
-  if (!prevHardState_ || (*prevHardState_) != hs) {
+  if (!prevHardState_->IsInitialized() || (*prevHardState_) != hs) {
     rd->hardState.reset(new pb::HardState(hs));
+    *prevHardState_ = hs;
   }
-  (*prevHardState_) = std::move(hs);
 
   // return null if Ready is empty
-  if (rd->entries.empty() && rd->messages.empty() && !rd->hardState) {
+  if (IsReadyEmpty(*rd)) {
     return nullptr;
   }
 
