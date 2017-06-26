@@ -48,8 +48,6 @@ struct Unstable {
     return entries.rbegin()->index();
   }
 
-  void StableTo(uint64_t i, uint64_t t) {}
-
   void TruncateAndAppend(EntriesIterator begin, EntriesIterator end) {
     DLOG_ASSERT(begin != end);
     if (!entries.empty() && begin->index() <= LastIndex()) {

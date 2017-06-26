@@ -43,10 +43,6 @@ class RawNode {
   // and returns null when there's no state ready (to be persisted or transferred).
   Ready *GetReady();
 
-  // Advance notifies the RawNode that the application has applied and saved progress in the
-  // last Ready results.
-  void Advance(const Ready &ready);
-
   const Config *GetConfig() const;
 
  private:
