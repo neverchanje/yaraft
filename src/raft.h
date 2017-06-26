@@ -284,19 +284,6 @@ class Raft {
       rejected = true;
     }
 
-    if (rejected) {
-      LOG(INFO) << fmt::format(
-          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] rejected {:s} from {:x} [logterm: "
-          "{:d}, index: {:d}] at term {:d}",
-          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
-          m.from(), m.logterm(), m.index(), currentTerm_);
-    } else {
-      LOG(INFO) << fmt::format(
-          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
-          "index: {:d}] at term {:d}",
-          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
-          m.from(), m.logterm(), m.index(), currentTerm_);
-    }
     sendVoteResp(m, rejected);
   }
 
@@ -457,6 +444,20 @@ class Raft {
   }
 
   void sendVoteResp(const pb::Message& m, bool reject) {
+    if (reject) {
+      LOG(INFO) << fmt::format(
+          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] rejected {:s} from {:x} [logterm: "
+              "{:d}, index: {:d}] at term {:d}",
+          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+          m.from(), m.logterm(), m.index(), currentTerm_);
+    } else {
+      LOG(INFO) << fmt::format(
+          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
+              "index: {:d}] at term {:d}",
+          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+          m.from(), m.logterm(), m.index(), currentTerm_);
+    }
+
     // send() will include term=currentTerm into message.
     send(PBMessage().Reject(reject).To(m.from()).Type(voteRespType(m.type())).v);
   }
