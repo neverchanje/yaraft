@@ -199,7 +199,7 @@ class Raft {
 
   void becomeCandidate() {
     if (role_ == kLeader)
-      throw RaftError("invalid transition [leader -> candidate]");
+      FMT_LOG(FATAL, "invalid transition [leader -> candidate]");
 
     role_ = kCandidate;
     LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
@@ -213,7 +213,7 @@ class Raft {
 
   void becomeLeader() {
     if (role_ == kFollower)
-      throw RaftError("invalid transition [follower -> leader]");
+      FMT_LOG(FATAL, "invalid transition [follower -> leader]");
 
     role_ = kLeader;
     currentLeader_ = id_;
@@ -447,13 +447,13 @@ class Raft {
     if (reject) {
       LOG(INFO) << fmt::format(
           "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] rejected {:s} from {:x} [logterm: "
-              "{:d}, index: {:d}] at term {:d}",
+          "{:d}, index: {:d}] at term {:d}",
           id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
           m.from(), m.logterm(), m.index(), currentTerm_);
     } else {
       LOG(INFO) << fmt::format(
           "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
-              "index: {:d}] at term {:d}",
+          "index: {:d}] at term {:d}",
           id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
           m.from(), m.logterm(), m.index(), currentTerm_);
     }

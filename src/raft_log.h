@@ -18,11 +18,10 @@
 #include <memory>
 
 #include "exception.h"
+#include "logging.h"
 #include "storage.h"
 #include "unstable.h"
 
-#include <fmt/format.h>
-#include <glog/logging.h>
 #include <silly/disallow_copying.h>
 
 namespace yaraft {
@@ -135,8 +134,8 @@ class RaftLog {
     }
 
     if (begin->index() <= commitIndex_) {
-      throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(),
-                      commitIndex_);
+      FMT_LOG(FATAL, "Append a committed entry at {:d}, committed: {:d}", begin->index(),
+              commitIndex_);
     }
     unstable_.TruncateAndAppend(begin, end);
   }
@@ -144,10 +143,10 @@ class RaftLog {
   void CommitTo(uint64_t to) {
     if (to > commitIndex_) {
       if (LastIndex() < to) {
-        throw RaftError(
-            "tocommit({:d}) is out of range [LastIndex({:d})]. Was the raft log corrupted, "
-            "truncated, or lost?",
-            to, LastIndex());
+        FMT_LOG(FATAL,
+                "tocommit({:d}) is out of range [LastIndex({:d})]. Was the raft log corrupted, "
+                "truncated, or lost?",
+                to, LastIndex());
       }
       commitIndex_ = to;
     }
@@ -260,7 +259,7 @@ class RaftLog {
   }
 
  public:
-  /// Only used for test
+  /// Used with caution
 
   EntryVec AllEntries() {
     auto s = Entries(FirstIndex(), LastIndex() + 1, std::numeric_limits<uint64_t>::max());
@@ -272,6 +271,10 @@ class RaftLog {
 
   Unstable& GetUnstable() {
     return unstable_;
+  }
+
+  Storage* GetStorage() {
+    return storage_.get();
   }
 
  private:
