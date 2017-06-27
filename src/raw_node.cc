@@ -15,6 +15,7 @@
 #include "raw_node.h"
 #include "conf.h"
 #include "fluent_pb.h"
+#include "memory_storage.h"
 #include "raft.h"
 #include "ready.h"
 
@@ -44,7 +45,7 @@ Status RawNode::Step(pb::Message& m) {
     return Status::Make(Error::StepLocalMsg, "cannot step raft local message");
   }
 
-  if (!raft_->HasPeer(m.from())) {
+  if (!raft_->HasPeer(m.from()) && IsResponseMsg(m)) {
     return Status::Make(Error::StepPeerNotFound,
                         "cannot step a response message from peer not found");
   }
@@ -59,7 +60,7 @@ Status RawNode::Campaign() {
 
 Ready* RawNode::GetReady() {
   std::unique_ptr<Ready> rd(new Ready);
-  rd->entries = std::move(raft_->log_->GetUnstable().entries);
+  rd->entries = &raft_->log_->GetUnstable().entries;
   rd->messages = std::move(raft_->mails_);
 
   pb::HardState hs = PBHardState().Vote(raft_->votedFor_).Term(raft_->currentTerm_).v;
@@ -74,6 +75,12 @@ Ready* RawNode::GetReady() {
   }
 
   return rd.release();
+}
+
+void RawNode::Advance(const Ready& ready) {
+  // stable the unstable entries to memory storage.
+  MemoryStorage* storage = static_cast<MemoryStorage*>(raft_->log_->GetStorage());
+  storage->Append(std::move(raft_->log_->GetUnstable().entries));
 }
 
 }  // namespace yaraft

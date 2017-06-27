@@ -30,9 +30,9 @@ struct Ready {
   // hardState will be equal to empty state if there is no update.
   std::unique_ptr<pb::HardState> hardState;
 
-  // Entries specifies entries to be saved to stable storage BEFORE
+  // `entries` specifies entries to be saved to stable storage BEFORE
   // Messages are sent.
-  EntryVec entries;
+  const EntryVec* entries;
 
   // Snapshot specifies the snapshot to be saved to stable storage.
   std::unique_ptr<pb::Snapshot> snapshot;
@@ -45,7 +45,7 @@ struct Ready {
 };
 
 inline bool IsReadyEmpty(const Ready& rd) {
-  return (!rd.hardState) && rd.entries.empty() && (!rd.snapshot) && rd.messages.empty();
+  return (!rd.hardState) && rd.entries->empty() && (!rd.snapshot) && rd.messages.empty();
 }
 
 }  // namespace yaraft
