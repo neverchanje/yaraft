@@ -15,5 +15,5 @@ install:
 - bash install_deps_if_necessary.sh
 
 script:
-- cd build && cmake .. && make
+- cd build && cmake .. -DBUILD_TEST=ON && make
 - bash ../run-tests.sh
