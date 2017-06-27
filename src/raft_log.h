@@ -134,8 +134,12 @@ class RaftLog {
     }
 
     if (begin->index() <= commitIndex_) {
+#ifdef BUILD_TESTS
+      throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(), commitIndex_);
+#else
       FMT_LOG(FATAL, "Append a committed entry at {:d}, committed: {:d}", begin->index(),
               commitIndex_);
+#endif
     }
     unstable_.TruncateAndAppend(begin, end);
   }

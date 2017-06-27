@@ -198,8 +198,13 @@ class Raft {
   }
 
   void becomeCandidate() {
-    if (role_ == kLeader)
+    if (role_ == kLeader) {
+#ifdef BUILD_TESTS
+      throw RaftError("invalid transition [leader -> candidate]");
+#else
       FMT_LOG(FATAL, "invalid transition [leader -> candidate]");
+#endif
+    }
 
     role_ = kCandidate;
     LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
@@ -212,8 +217,13 @@ class Raft {
   }
 
   void becomeLeader() {
-    if (role_ == kFollower)
+    if (role_ == kFollower) {
+#ifdef BUILD_TESTS
+      throw RaftError("invalid transition [follower -> leader]");
+#else
       FMT_LOG(FATAL, "invalid transition [follower -> leader]");
+#endif
+    }
 
     role_ = kLeader;
     currentLeader_ = id_;

@@ -27,6 +27,7 @@ function(ADD_YARAFT_TEST TEST_NAME)
 endfunction()
 
 if(${BUILD_TEST})
+    add_definitions(-DBUILD_TESTS)
     ADD_YARAFT_TEST(memory_storage_test)
     ADD_YARAFT_TEST(util_test)
     ADD_YARAFT_TEST(progress_test)
