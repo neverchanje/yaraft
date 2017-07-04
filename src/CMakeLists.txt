@@ -5,16 +5,17 @@ set(YARAFT_TEST_LINK_LIBS
         ${GLOG_STATIC_LIB})
 
 set(YARAFT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
+set(YARAFT_PROTO_DIR ${YARAFT_SOURCE_DIR}/yaraft/pb)
 add_library(yaraft
         ${YARAFT_SOURCE_DIR}/memory_storage.cc
         ${YARAFT_SOURCE_DIR}/pb_utils.cc
         ${YARAFT_SOURCE_DIR}/raw_node.cc
         ${YARAFT_SOURCE_DIR}/status.cc
-        ${YARAFT_SOURCE_DIR}/yaraft/pb/raftpb.pb.cc)
+        ${YARAFT_PROTO_DIR}/raftpb.pb.cc)
 target_link_libraries(yaraft ${YARAFT_TEST_LINK_LIBS})
 
 file(GLOB LIBYARAFT_INSTALL_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h")
-file(GLOB LIBYARAFT_INSTALL_PB "${PROTO_DIR}/*.h" "${PROTO_DIR}/*.proto")
+file(GLOB LIBYARAFT_INSTALL_PB "${YARAFT_PROTO_DIR}/*.h" "${YARAFT_PROTO_DIR}/*.proto")
 install(TARGETS yaraft DESTINATION lib)
 install(FILES ${LIBYARAFT_INSTALL_HEADERS} DESTINATION include/yaraft)
 install(FILES ${LIBYARAFT_INSTALL_PB} DESTINATION include/yaraft/pb)
