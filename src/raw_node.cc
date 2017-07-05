@@ -83,4 +83,12 @@ void RawNode::Advance(const Ready& ready) {
   storage->Append(std::move(raft_->log_->GetUnstable().entries));
 }
 
+RaftInfo RawNode::GetInfo() const {
+  RaftInfo info;
+  info.logIndex = raft_->log_->LastIndex();
+  info.currentLeader = raft_->currentLeader_;
+  info.currentTerm = raft_->currentTerm_;
+  return info;
+}
+
 }  // namespace yaraft

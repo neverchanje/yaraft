@@ -24,6 +24,12 @@ class Raft;
 class Config;
 class Ready;
 
+struct RaftInfo {
+  uint64_t currentLeader;
+  uint64_t currentTerm;
+  uint64_t logIndex;
+};
+
 class RawNode {
  public:
   explicit RawNode(Config *conf);
@@ -48,6 +54,8 @@ class RawNode {
   void Advance(const Ready &ready);
 
   const Config *GetConfig() const;
+
+  RaftInfo GetInfo() const;
 
  private:
   // auto-deleted
