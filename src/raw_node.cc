@@ -53,6 +53,12 @@ Status RawNode::Step(pb::Message& m) {
   return raft_->Step(m);
 }
 
+Status RawNode::Propose(const silly::Slice& data) {
+  uint64_t id = raft_->Id(), term = raft_->Term();
+  auto e = PBEntry().Data(data).v;
+  return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgProp).Term(term).Entries({e}).v);
+}
+
 Status RawNode::Campaign() {
   uint64_t id = raft_->Id(), term = raft_->Term();
   return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgHup).Term(term).v);
@@ -81,6 +87,14 @@ void RawNode::Advance(const Ready& ready) {
   // stable the unstable entries to memory storage.
   MemoryStorage* storage = static_cast<MemoryStorage*>(raft_->log_->GetStorage());
   storage->Append(std::move(raft_->log_->GetUnstable().entries));
+}
+
+RaftInfo RawNode::GetInfo() const {
+  RaftInfo info;
+  info.logIndex = raft_->log_->LastIndex();
+  info.currentLeader = raft_->currentLeader_;
+  info.currentTerm = raft_->currentTerm_;
+  return info;
 }
 
 }  // namespace yaraft

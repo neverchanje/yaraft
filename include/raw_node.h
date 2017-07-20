@@ -24,6 +24,12 @@ class Raft;
 class Config;
 class Ready;
 
+struct RaftInfo {
+  uint64_t currentLeader;
+  uint64_t currentTerm;
+  uint64_t logIndex;
+};
+
 class RawNode {
  public:
   explicit RawNode(Config *conf);
@@ -39,6 +45,9 @@ class RawNode {
   // Campaign causes this RawNode to transition to candidate state.
   Status Campaign();
 
+  // Propose proposes data be appended to the raft log.
+  Status Propose(const silly::Slice& data);
+
   // GetReady returns the current point-in-time state of this RawNode,
   // and returns null when there's no state ready (to be persisted or transferred).
   Ready *GetReady();
@@ -48,6 +57,8 @@ class RawNode {
   void Advance(const Ready &ready);
 
   const Config *GetConfig() const;
+
+  RaftInfo GetInfo() const;
 
  private:
   // auto-deleted
