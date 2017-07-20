@@ -45,6 +45,9 @@ class RawNode {
   // Campaign causes this RawNode to transition to candidate state.
   Status Campaign();
 
+  // Propose proposes data be appended to the raft log.
+  Status Propose(const silly::Slice& data);
+
   // GetReady returns the current point-in-time state of this RawNode,
   // and returns null when there's no state ready (to be persisted or transferred).
   Ready *GetReady();

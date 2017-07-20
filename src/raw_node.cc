@@ -53,6 +53,12 @@ Status RawNode::Step(pb::Message& m) {
   return raft_->Step(m);
 }
 
+Status RawNode::Propose(const silly::Slice& data) {
+  uint64_t id = raft_->Id(), term = raft_->Term();
+  auto e = PBEntry().Data(data).v;
+  return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgProp).Term(term).Entries({e}).v);
+}
+
 Status RawNode::Campaign() {
   uint64_t id = raft_->Id(), term = raft_->Term();
   return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgHup).Term(term).v);
