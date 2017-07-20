@@ -135,6 +135,11 @@ struct PBHardState {
     v.set_term(term);
     return *this;
   }
+
+  PBHardState& Commit(uint64_t commit) {
+    v.set_commit(commit);
+    return *this;
+  }
 };
 
 }  // namespace yaraft
