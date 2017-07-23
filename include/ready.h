@@ -42,10 +42,12 @@ struct Ready {
   // If it contains a MsgSnap message, the application MUST report back to raft
   // when the snapshot has been received or has failed by calling ReportSnapshot.
   std::vector<pb::Message> messages;
-};
 
-inline bool IsReadyEmpty(const Ready& rd) {
-  return (!rd.hardState) && rd.entries->empty() && (!rd.snapshot) && rd.messages.empty();
-}
+ public:
+
+  bool IsEmpty() const {
+    return (!hardState) && entries->empty() && (!snapshot) && messages.empty();
+  }
+};
 
 }  // namespace yaraft

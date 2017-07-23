@@ -76,7 +76,7 @@ Ready* RawNode::GetReady() {
   }
 
   // return null if Ready is empty
-  if (IsReadyEmpty(*rd)) {
+  if (rd->IsEmpty()) {
     return nullptr;
   }
 
