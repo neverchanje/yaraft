@@ -22,7 +22,20 @@
 namespace yaraft {
 
 bool operator==(const pb::HardState& a, const pb::HardState& b) {
-  return a.term() == b.term() && a.vote() == b.vote();
+#define COMPARE_PROTO_OPTIONAL_FIELD(msg1, msg2, field)                                 \
+  ((msg1).has_##field() && (msg2).has_##field() && (msg1).field() == (msg2).field()) || \
+      (!(msg1).has_##field() && !(msg2).has_##field())
+
+  if (!COMPARE_PROTO_OPTIONAL_FIELD(a, b, commit))
+    return false;
+  if (!COMPARE_PROTO_OPTIONAL_FIELD(a, b, vote))
+    return false;
+  if (!COMPARE_PROTO_OPTIONAL_FIELD(a, b, term))
+    return false;
+
+#undef COMPARE_PROTO_OPTIONAL_FIELD
+
+  return true;
 }
 
 bool operator!=(const pb::HardState& a, const pb::HardState& b) {
