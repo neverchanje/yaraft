@@ -29,6 +29,8 @@ include_directories(SYSTEM ${PROTOBUF_INCLUDE_DIR})
 find_package(GLog REQUIRED)
 include_directories(SYSTEM ${GLOG_INCLUDE_DIR})
 
+find_package(Gflags REQUIRED)
+
 find_library(SILLY_LIBRARY silly_lite PATH ${DEPS_LIB_DIR})
 message("-- Found ${SILLY_LIBRARY}")
 

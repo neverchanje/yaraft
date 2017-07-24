@@ -2,7 +2,8 @@ set(YARAFT_TEST_LINK_LIBS
         gtest gtest_main
         ${PROTOBUF_STATIC_LIBRARY}
         ${FMT_LIBRARY}
-        ${GLOG_STATIC_LIB})
+        ${GLOG_STATIC_LIB}
+        ${GFLAGS_STATIC_LIB})
 
 set(YARAFT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/src)
 set(YARAFT_PROTO_DIR ${YARAFT_SOURCE_DIR}/yaraft/pb)

@@ -26,6 +26,10 @@ SILLY_VERSION=0.0.1-alpha-1
 SILLY_NAME=silly-$SILLY_VERSION
 SILLY_SOURCE=$TP_DIR/$SILLY_NAME
 
+GFLAG_VERSION=2.2.0
+GFLAG_NAME=gflags-$GFLAG_VERSION
+GFLAG_SOURCE=$TP_DIR/$GFLAG_NAME
+
 QINIU_CDN_URL_PREFIX=http://onnzg1pyx.bkt.clouddn.com
 
 make_stamp() {
@@ -124,4 +128,20 @@ build_fmtlib() {
   cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DFMT_TEST=false
 	make -j4 && make install
 	popd
+}
+
+build_gflag() {
+  mkdir -p $GFLAG_SOURCE/build
+  pushd $GFLAG_SOURCE/build
+  rm -rf CMakeCache.txt CMakeFiles/
+  cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=On \
+    -DCMAKE_INSTALL_PREFIX=$TP_BUILD_DIR \
+    -DBUILD_SHARED_LIBS=On \
+    -DBUILD_STATIC_LIBS=On \
+    -DREGISTER_INSTALL_PREFIX=Off \
+    $GFLAG_SOURCE
+  make -j8 install
+  popd
 }
