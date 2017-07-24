@@ -28,6 +28,7 @@ struct RaftInfo {
   uint64_t currentLeader;
   uint64_t currentTerm;
   uint64_t logIndex;
+  uint64_t commitIndex;
 };
 
 class RawNode {

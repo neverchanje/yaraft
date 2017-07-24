@@ -16,6 +16,7 @@
 #pragma once
 
 #include "storage.h"
+#include "memory_storage.h"
 
 #include <yaraft/pb/raftpb.pb.h>
 
@@ -32,7 +33,7 @@ struct Ready {
 
   // `entries` specifies entries to be saved to stable storage BEFORE
   // Messages are sent.
-  const EntryVec* entries;
+  EntryVec entries;
 
   // Snapshot specifies the snapshot to be saved to stable storage.
   std::unique_ptr<pb::Snapshot> snapshot;
@@ -46,7 +47,12 @@ struct Ready {
  public:
 
   bool IsEmpty() const {
-    return (!hardState) && entries->empty() && (!snapshot) && messages.empty();
+    return (!hardState) && entries.empty() && (!snapshot) && messages.empty();
+  }
+
+  void Advance(MemoryStorage* store) {
+    // stable the unstable entries to memory storage.
+    store->Append(std::move(entries));
   }
 };
 

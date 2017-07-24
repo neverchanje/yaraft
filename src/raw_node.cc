@@ -66,10 +66,14 @@ Status RawNode::Campaign() {
 
 Ready* RawNode::GetReady() {
   std::unique_ptr<Ready> rd(new Ready);
-  rd->entries = &raft_->log_->GetUnstable().entries;
+  rd->entries = std::move(raft_->log_->GetUnstable().entries);
   rd->messages = std::move(raft_->mails_);
 
-  pb::HardState hs = PBHardState().Vote(raft_->votedFor_).Term(raft_->currentTerm_).v;
+  pb::HardState hs = PBHardState()
+                         .Vote(raft_->votedFor_)
+                         .Term(raft_->currentTerm_)
+                         .Commit(raft_->log_->CommitIndex())
+                         .v;
   if (!prevHardState_->IsInitialized() || (*prevHardState_) != hs) {
     rd->hardState.reset(new pb::HardState(hs));
     *prevHardState_ = hs;
@@ -83,17 +87,12 @@ Ready* RawNode::GetReady() {
   return rd.release();
 }
 
-void RawNode::Advance(const Ready& ready) {
-  // stable the unstable entries to memory storage.
-  MemoryStorage* storage = static_cast<MemoryStorage*>(raft_->log_->GetStorage());
-  storage->Append(std::move(raft_->log_->GetUnstable().entries));
-}
-
 RaftInfo RawNode::GetInfo() const {
   RaftInfo info;
   info.logIndex = raft_->log_->LastIndex();
   info.currentLeader = raft_->currentLeader_;
   info.currentTerm = raft_->currentTerm_;
+  info.commitIndex = raft_->log_->CommitIndex();
   return info;
 }
 
