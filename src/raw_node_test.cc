@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "raw_node.h"
-#include "test_utils.h"
 #include "ready.h"
+#include "test_utils.h"
 
 using namespace yaraft;
 
@@ -34,11 +34,17 @@ TEST(RawNode, Propose) {
   ASSERT_EQ(rn.GetInfo().currentTerm, 1);
   ASSERT_EQ(rn.GetInfo().currentLeader, 1);
 
-  for(int i=0; i<4; i++) {
+  for (int i = 0; i < 4; i++) {
     rn.Propose("a");
   }
 
   auto rd = rn.GetReady();
+  ASSERT_TRUE(rd->hardState);
+  ASSERT_TRUE(rd->hardState->has_commit());
+  ASSERT_EQ(rd->hardState->commit(), 5);
+  ASSERT_TRUE(rd->hardState->has_term());
+  ASSERT_EQ(rd->hardState->term(), 1);
+
   rd->Advance(memstore);
 
   ASSERT_TRUE(rd->IsEmpty());
