@@ -14,6 +14,7 @@
 
 #include "raw_node.h"
 #include "test_utils.h"
+#include "ready.h"
 
 using namespace yaraft;
 
@@ -24,4 +25,25 @@ TEST(RawNode, Step) {
     auto s = rn.Step(PBMessage().From(1).To(1).Type(static_cast<pb::MessageType>(i)).v);
     ASSERT_EQ(s.Code(), Error::StepLocalMsg);
   }
+}
+
+TEST(RawNode, Propose) {
+  auto memstore = new MemoryStorage();
+  RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
+  rn.Campaign();
+  ASSERT_EQ(rn.GetInfo().currentTerm, 1);
+  ASSERT_EQ(rn.GetInfo().currentLeader, 1);
+
+  for(int i=0; i<4; i++) {
+    rn.Propose("a");
+  }
+
+  auto rd = rn.GetReady();
+  rd->Advance(memstore);
+
+  ASSERT_TRUE(rd->IsEmpty());
+
+  // one no-op for election, 4 proposed logs
+  ASSERT_EQ(rn.GetInfo().commitIndex, 5);
+  ASSERT_EQ(rn.GetInfo().logIndex, 5);
 }

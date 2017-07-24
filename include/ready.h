@@ -51,8 +51,14 @@ struct Ready {
   }
 
   void Advance(MemoryStorage* store) {
-    // stable the unstable entries to memory storage.
-    store->Append(std::move(entries));
+    if(!entries.empty()) {
+      // stable the unstable entries to memory storage.
+      store->Append(std::move(entries));
+    }
+
+    if(hardState) {
+      hardState.reset(nullptr);
+    }
   }
 };
 
