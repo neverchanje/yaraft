@@ -190,6 +190,7 @@ class Raft {
 
   void becomePreCandidate() {
     role_ = kPreCandidate;
+    currentLeader_ = 0;
 
     // Becoming a pre-candidate changes our state,
     // but doesn't change anything else. In particular it does not increase
@@ -287,9 +288,8 @@ class Raft {
       rejected = true;
     }
 
-    // If votedFor is null or candidateId, and candidate's log
-    // is at least as up­to­date as receiver's log, grant vote
-    if ((votedFor_ == 0 || votedFor_ == m.from()) && log_->IsUpToDate(m.index(), m.logterm())) {
+    // If candidate's log is at least as up­to­date as receiver's log, grant vote
+    if (log_->IsUpToDate(m.index(), m.logterm())) {
     } else {
       rejected = true;
     }
