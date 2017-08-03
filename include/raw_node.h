@@ -62,8 +62,7 @@ class RawNode {
   RaftInfo GetInfo() const;
 
  private:
-  // auto-deleted
-  Raft *raft_;
+  std::unique_ptr<Raft> raft_;
 
   std::unique_ptr<pb::HardState> prevHardState_;
 };

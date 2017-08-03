@@ -45,7 +45,6 @@ bool operator!=(const pb::HardState& a, const pb::HardState& b) {
 RawNode::RawNode(Config* conf) : raft_(new Raft(conf)), prevHardState_(new pb::HardState) {}
 
 RawNode::~RawNode() {
-  delete raft_;
 }
 
 void RawNode::Tick() {
