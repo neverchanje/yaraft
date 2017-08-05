@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "raft.h"
 #include "memory_storage.h"
+#include "raft.h"
 #include "test_utils.h"
 
 namespace yaraft {
@@ -502,11 +502,88 @@ class RaftTest {
         ASSERT_EQ(r->log_->CommitIndex(), 2);
 
         auto ev = r->log_->AllEntries();
-        ASSERT_TRUE(ev[0] == PBEntry().Term(1).Index(1).v);
-        ASSERT_TRUE(ev[1] == PBEntry().Term(1).Index(2).Data("some data").v);
         ASSERT_EQ(ev.size(), 2);
+        Entry_ASSERT_EQ(ev[0], PBEntry().Term(1).Index(1).Data("").v);
+        Entry_ASSERT_EQ(ev[1], PBEntry().Term(1).Index(2).Data("some data").v);
       }
     }
+  }
+
+  static void TestRestore() {
+    auto snap = PBSnapshot().MetaIndex(11).MetaTerm(11).MetaConfState({1, 2, 3}).v;
+
+    auto storage = new MemoryStorage;
+    RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, storage));
+
+    pb::Snapshot tmp;
+    tmp.CopyFrom(snap);
+    ASSERT_TRUE(r->restore(tmp));
+
+    ASSERT_EQ(r->log_->LastIndex(), snap.metadata().index());
+    ASSERT_EQ(r->log_->Term(snap.metadata().index()).GetValue(), snap.metadata().term());
+
+    std::set<uint64_t> actual;
+    for (const auto &e : r->prs_) {
+      actual.insert(e.first);
+    }
+
+    std::set<uint64_t> expected;
+    for (const auto &e : snap.metadata().conf_state().nodes()) {
+      expected.insert(e);
+    }
+
+    ASSERT_EQ(actual, expected);
+
+    tmp.CopyFrom(snap);
+    ASSERT_FALSE(r->restore(tmp));
+  }
+
+  static void TestRestoreIgnoreSnapshot() {
+    EntryVec previousEnts = {PBEntry().Index(1).Term(1).v, PBEntry().Index(2).Term(1).v,
+                             PBEntry().Index(3).Term(1).v};
+    uint64_t commit = 1;
+
+    auto storage = new MemoryStorage;
+    RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, storage));
+    r->log_->Append(previousEnts);
+    r->log_->CommitTo(commit);
+
+    // ignore snapshot
+    auto snap = PBSnapshot().MetaIndex(commit).MetaTerm(1).MetaConfState({1, 2}).v;
+    ASSERT_FALSE(r->restore(snap));
+    ASSERT_EQ(r->log_->CommitIndex(), commit);
+
+    // ignore snapshot and fast forward commit
+    snap = PBSnapshot().MetaIndex(commit + 1).MetaTerm(1).MetaConfState({1, 2}).v;
+    ASSERT_FALSE(r->restore(snap));
+    ASSERT_EQ(r->log_->CommitIndex(), commit + 1);
+  }
+
+  static void TestProvideSnap() {
+    // restore the state machine from a snapshot so it has a compacted log and a snapshot
+    auto snap = PBSnapshot().MetaIndex(11).MetaTerm(11).MetaConfState({1, 2}).v;
+
+    auto storage = new MemoryStorage;
+    RaftUPtr r(newTestRaft(1, {1}, 10, 1, storage));
+    r->restore(snap);
+
+    r->becomeCandidate();
+    r->becomeLeader();
+
+    // force set the next of node 2, so that node 2 needs a snapshot
+    r->prs_[2].NextIndex(r->log_->FirstIndex());
+
+    r->Step(PBMessage()
+                .From(2)
+                .To(1)
+                .Type(pb::MsgAppResp)
+                .Index(r->prs_[2].NextIndex() - 1)
+                .Term(1)
+                .Reject()
+                .v);
+
+    ASSERT_EQ(r->mails_.size(), 1);
+    ASSERT_EQ(r->mails_[0].type(), pb::MsgSnap);
   }
 };
 
@@ -592,4 +669,16 @@ TEST(Raft, SingleNodeCommit) {
 
 TEST(Raft, ProposalByProxy) {
   RaftTest::TestProposalByProxy();
+}
+
+TEST(Raft, Restore) {
+  RaftTest::TestRestore();
+}
+
+TEST(Raft, RestoreIgnoreSnapshot) {
+  RaftTest::TestRestoreIgnoreSnapshot();
+}
+
+TEST(Raft, ProvideSnap) {
+  RaftTest::TestProvideSnap();
 }

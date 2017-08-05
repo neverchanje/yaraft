@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include "memory_storage.h"
+#include "exception.h"
 
 #include <glog/logging.h>
 
@@ -74,7 +75,16 @@ Status MemoryStorage::Compact(uint64_t compactIndex) {
   if (compactIndex <= beginIndex) {
     return Status::Make(Error::LogCompacted);
   }
-  LOG_ASSERT(compactIndex <= entries_.rbegin()->index());
+
+  if (compactIndex > lastIndex()) {
+#ifdef BUILD_TESTS
+    throw RaftError("compact {} is out of bound lastindex({})", compactIndex,
+                    LastIndex().GetValue());
+#else
+    FMT_LOG(FATAL, "compact {} is out of bound lastindex({})", compactIndex,
+            LastIndex().GetValue());
+#endif
+  }
 
   size_t compactOffset = compactIndex - beginIndex;
 

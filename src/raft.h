@@ -24,27 +24,16 @@
 #include "conf.h"
 #include "exception.h"
 #include "fluent_pb.h"
+#include "logging.h"
 #include "pb_utils.h"
 #include "progress.h"
 #include "raft_log.h"
-
-#include <fmt/format.h>
-#include <glog/logging.h>
 
 namespace yaraft {
 
 inline pb::MessageType voteRespType(pb::MessageType voteType) {
   return voteType == pb::MsgVote ? pb::MsgVoteResp : pb::MsgPreVoteResp;
 }
-
-/// @brief Emit a fatal error if @c to_call returns a bad status.
-#define FATAL_NOT_OK(to_call, fatal_prefix)                  \
-  do {                                                       \
-    const auto& _s = (to_call);                              \
-    if (UNLIKELY(!_s.IsOK())) {                              \
-      LOG(FATAL) << (fatal_prefix) << ": " << _s.ToString(); \
-    }                                                        \
-  } while (0);
 
 class Raft {
   enum CampaignType {
@@ -375,9 +364,12 @@ class Raft {
         becomeFollower(m.term(), m.from());
         handleHeartbeat(m);
         break;
-
       case pb::MsgProp:
         handleMsgPropCandidate(m);
+        break;
+      case pb::MsgSnap:
+        becomeFollower(m.term(), m.from());
+        handleSnapshot(m);
         break;
 
       default:
@@ -395,6 +387,12 @@ class Raft {
         break;
       case pb::MsgProp:
         handleMsgPropFollower(m);
+        break;
+      case pb::MsgSnap:
+        handleSnapshot(m);
+        break;
+      default:
+        // ignored
         break;
     }
   }
@@ -442,6 +440,13 @@ class Raft {
     m.set_from(id_);
 
     if (m.type() == pb::MsgVote || m.type() == pb::MsgPreVote) {
+      // All {pre-,}campaign messages need to have the term set when
+      // sending.
+      // - MsgVote: m.Term is the term the node is campaigning for,
+      //   non-zero as we increment the term when campaigning.
+      // - MsgPreVote: m.Term is the term the node will campaign,
+      //   non-zero as we use m.Term to indicate the next term we'll be
+      //   campaigning for
       DLOG_ASSERT(m.term() != 0) << fmt::format(" term should be set when sending {:s}",
                                                 pb::MessageType_Name(m.type()));
     } else {
@@ -502,16 +507,28 @@ class Raft {
 
     uint64_t prevLogIndex = pr.NextIndex() - 1;
     auto sTerm = log_->Term(prevLogIndex);
+    auto sEnts = log_->Entries(pr.NextIndex(), c_->maxSizePerMsg);
 
-    if (sTerm.OK()) {
+    if (sTerm.IsOK() && sEnts.IsOK()) {
       uint64_t prevLogTerm = sTerm.GetValue();
 
-      auto sEnts = log_->Entries(pr.NextIndex(), c_->maxSizePerMsg);
-      FATAL_NOT_OK(sEnts.GetStatus(), "RaftLog::Entries");
       m.Entries(sEnts.GetValue());
-
       m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm).Commit(log_->CommitIndex());
     } else {
+      // send snapshot if we failed to get term or entries
+      pb::Snapshot snap = log_->Snapshot().GetValue();
+      if (!snap.IsInitialized()) {
+        FMT_SLOG(FATAL,
+                 "%x failed to send snapshot to %x because snapshot is temporarily unavailable",
+                 id_, to);
+      }
+
+      D_FMT_SLOG(INFO,
+                 "%x [lastindex: %d, commit: %d] sent snapshot[index: %d, term: %d] to %x [%s]",
+                 id_, log_->LastIndex(), log_->CommitIndex(), snap.metadata().index(),
+                 snap.metadata().term(), to, pr.ToString());
+
+      m.Type(pb::MsgSnap).Snapshot(snap);
     }
     send(m.v);
   }
@@ -604,7 +621,6 @@ class Raft {
 
   void handleMsgPropCandidate(const pb::Message& m) {
     LOG(INFO) << fmt::format("{:x} no leader at term {:d}; dropping proposal", id_, currentTerm_);
-    return;
   }
 
   void appendRawEntries(pb::Message& m) {
@@ -676,6 +692,64 @@ class Raft {
     static std::default_random_engine engine(seed);
     static std::uniform_int_distribution<int> rand(c_->electionTick, 2 * c_->electionTick - 1);
     randomizedElectionTimeout_ = rand(engine);
+  }
+
+  // restore recovers the state machine from a snapshot. It restores the log and the
+  // configuration of state machine.
+  // @returns true if restore success
+  bool restore(pb::Snapshot& snap) {
+    if (snap.metadata().index() <= log_->CommitIndex()) {
+      return false;
+    }
+
+    StatusWith<uint64_t> sw = log_->Term(snap.metadata().index());
+    if (sw.IsOK() && sw.GetValue() == snap.metadata().term()) {
+      FMT_SLOG(INFO,
+               "%x [commit: %d, lastindex: %d, lastterm: %d] fast-forwarded commit to snapshot "
+               "[index: %d, term: %d]",
+               id_, log_->CommitIndex(), log_->LastIndex(), log_->LastTerm(),
+               snap.metadata().index(), snap.metadata().term());
+
+      log_->CommitTo(snap.metadata().index());
+      return false;
+    }
+
+    prs_.clear();
+    for (uint64_t n : snap.metadata().conf_state().nodes()) {
+      uint64_t match = 0, next = log_->LastIndex() + 1;
+      if (n == id_) {
+        match = next - 1;
+      }
+      prs_[n].MatchIndex(match).NextIndex(next);
+      FMT_SLOG(INFO, "%x restored progress of %x [%s]", id_, n, prs_[n].ToString());
+    }
+
+    // apply snapshot only when there's no existing log entry with the same index and term as
+    // Snapshot.LastIndex and Snapshot.LastTerm.
+    // the snapshot will clear the entries in raftLog
+    FMT_SLOG(INFO,
+             "%x [commit: %d, lastindex: %d, lastterm: %d] starts to restore snapshot [index: %d, "
+             "term: %d]",
+             id_, log_->CommitIndex(), log_->LastIndex(), log_->LastTerm(), snap.metadata().index(),
+             snap.metadata().term());
+    log_->Restore(snap);
+    return true;
+  }
+
+  void handleSnapshot(pb::Message& m) {
+    uint64_t sindex = m.snapshot().metadata().index();
+    uint64_t sterm = m.snapshot().metadata().term();
+    if (restore(*m.mutable_snapshot())) {
+      FMT_SLOG(INFO, "%x [commit: %d] restored snapshot [index: %d, term: %d]", id_,
+               log_->CommitIndex(), sindex, sterm);
+      send(PBMessage().Type(pb::MsgAppResp).To(m.from()).Index(log_->CommitIndex()).v);
+    } else {
+      FMT_SLOG(INFO, "%x [commit: %d] ignored snapshot [index: %d, term: %d]", id_,
+               log_->CommitIndex(), sindex, sterm);
+
+      // ignore but not reject
+      send(PBMessage().Type(pb::MsgAppResp).To(m.from()).Index(log_->CommitIndex()).v);
+    }
   }
 
  private:

@@ -304,8 +304,8 @@ class RaftPaperTest {
                   .Entries(t.ents)
                   .v);
 
-      ASSERT_TRUE(r->log_->AllEntries() == t.wents);
-      ASSERT_TRUE(r->log_->GetUnstable().entries == t.wunstable);
+      EntryVec_ASSERT_EQ(r->log_->AllEntries(), t.wents);
+      EntryVec_ASSERT_EQ(r->log_->GetUnstable().entries, t.wunstable);
     }
   }
 
@@ -351,8 +351,7 @@ class RaftPaperTest {
       EntryVec& unstable = r->log_->GetUnstable().entries;
       std::copy(unstable.begin(), unstable.end(), std::back_inserter(actual));
 
-      std::cout << actual << expect;
-      ASSERT_TRUE(actual == expect);
+      EntryVec_ASSERT_EQ(actual, expect);
     }
   }
 
@@ -448,8 +447,8 @@ class RaftPaperTest {
     ASSERT_EQ(r->log_->LastIndex(), li + 1);
     ASSERT_EQ(r->log_->CommitIndex(), li);
 
-    auto wents = {PBEntry().Term(1).Index(li + 1).Data("some data").v};
-    ASSERT_TRUE(r->log_->GetUnstable().entries == wents);
+    EntryVec wents({PBEntry().Term(1).Index(li + 1).Data("some data").v});
+    EntryVec_ASSERT_EQ(r->log_->GetUnstable().entries, wents);
 
     std::unordered_set<std::string> s1;
     std::for_each(r->mails_.begin(), r->mails_.end(),
@@ -662,7 +661,7 @@ class RaftPaperTest {
 
       auto followerEnts = follower->log_->Entries(follower->log_->FirstIndex(), noLimit);
       auto leadEnts = lead->log_->Entries(lead->log_->FirstIndex(), noLimit);
-      ASSERT_TRUE(followerEnts.GetValue() == leadEnts.GetValue());
+      EntryVec_ASSERT_EQ(followerEnts.GetValue(), leadEnts.GetValue());
     }
   }
 
