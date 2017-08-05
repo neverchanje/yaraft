@@ -18,3 +18,16 @@
 #define FMT_LOG(level, formatStr, args...) LOG(level) << fmt::format(formatStr, ##args)
 
 #define FMT_SLOG(level, formatStr, args...) LOG(level) << fmt::sprintf(formatStr, ##args)
+
+#define D_FMT_LOG(level, formatStr, args...) DLOG(level) << fmt::format(formatStr, ##args)
+
+#define D_FMT_SLOG(level, formatStr, args...) DLOG(level) << fmt::sprintf(formatStr, ##args)
+
+/// @brief Emit a fatal error if @c to_call returns a bad status.
+#define FATAL_NOT_OK(to_call, fatal_prefix)                  \
+  do {                                                       \
+    const auto& _s = (to_call);                              \
+    if (UNLIKELY(!_s.IsOK())) {                              \
+      LOG(FATAL) << (fatal_prefix) << ": " << _s.ToString(); \
+    }                                                        \
+  } while (0);
