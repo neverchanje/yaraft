@@ -267,32 +267,19 @@ EntryVec operator+(pb::Entry e1, pb::Entry e2) {
   return v;
 }
 
-inline bool operator==(pb::Entry e1, pb::Entry e2) {
-  bool result = (e1.term() == e2.term()) && (e1.index() == e2.index());
-  return result;
-}
-
-inline bool operator!=(pb::Entry e1, pb::Entry e2) {
-  return !(e1 == e2);
-}
-
-inline bool operator==(EntryVec v1, EntryVec v2) {
-  if (v1.size() != v2.size())
-    return false;
-  auto it1 = v1.begin();
-  auto it2 = v2.begin();
-  while (it1 != v1.end()) {
-    if (*it1++ != *it2++)
-      return false;
-  }
-  return true;
-}
-
-uint64_t mustTerm(const RaftLog& log, uint64_t index) {
-  auto s = log.Term(index);
-  return s.OK() ? s.GetValue() : 0;
-}
-
 static uint64_t noLimit = std::numeric_limits<uint64_t>::max();
+
+#define Entry_ASSERT_EQ(expected, actual) \
+  ASSERT_EQ((expected).DebugString(), (actual).DebugString());
+
+#define EntryVec_ASSERT_EQ(expected, actual)     \
+  do {                                           \
+    auto& _expected = (expected);                \
+    auto& _actual = (actual);                    \
+    ASSERT_EQ(_expected.size(), _actual.size()); \
+    for (int i = 0; i < _expected.size(); i++) { \
+      Entry_ASSERT_EQ(_expected[i], _actual[i]); \
+    }                                            \
+  } while (0)
 
 }  // namespace yaraft
