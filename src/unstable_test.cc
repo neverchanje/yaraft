@@ -13,42 +13,63 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unstable.h"
 #include "test_utils.h"
+#include "unstable.h"
 
 using namespace yaraft;
 
 TEST(Unstable, TruncateAndAppend) {
   struct TestData {
     std::vector<pb::Entry> entries;
+    uint64_t offset;
+    pb::Snapshot* snap;
     std::vector<pb::Entry> toAppend;
 
+    uint64_t woffset;
     std::vector<pb::Entry> wentries;
   } tests[] = {
       {
           // append to the end
           {pbEntry(5, 1)},
+          5,
+          nullptr,
           {pbEntry(6, 1), pbEntry(7, 1)},
+          5,
           {pbEntry(5, 1), pbEntry(6, 1), pbEntry(7, 1)},
       },
-      // replace the unstable entries
       {
-          {pbEntry(5, 1)}, {pbEntry(5, 2), pbEntry(6, 2)}, {pbEntry(5, 2), pbEntry(6, 2)},
+          // replace the unstable entries
+          {pbEntry(5, 1)},
+          5,
+          nullptr,
+          {pbEntry(5, 2), pbEntry(6, 2)},
+          5,
+          {pbEntry(5, 2), pbEntry(6, 2)},
       },
       {
           {pbEntry(5, 1)},
+          5,
+          nullptr,
           {pbEntry(4, 2), pbEntry(5, 2), pbEntry(6, 2)},
+          4,
           {pbEntry(4, 2), pbEntry(5, 2), pbEntry(6, 2)},
       },
-      // truncate the existing entries and append
+
+      /// truncate the existing entries and append
       {
           {pbEntry(5, 1), pbEntry(6, 1), pbEntry(7, 1)},
+          5,
+          nullptr,
           {pbEntry(6, 2)},
+          5,
           {pbEntry(5, 1), pbEntry(6, 2)},
       },
       {
           {pbEntry(5, 1), pbEntry(6, 1), pbEntry(7, 1)},
+          5,
+          nullptr,
           {pbEntry(7, 2), pbEntry(8, 2)},
+          5,
           {pbEntry(5, 1), pbEntry(6, 1), pbEntry(7, 2), pbEntry(8, 2)},
       },
   };
@@ -56,9 +77,94 @@ TEST(Unstable, TruncateAndAppend) {
   for (auto t : tests) {
     Unstable u;
     u.entries = t.entries;
+    u.offset = t.offset;
+    u.snapshot.reset(t.snap);
 
     auto msg = PBMessage().Entries(t.toAppend).v;
     u.TruncateAndAppend(msg.mutable_entries()->begin(), msg.mutable_entries()->end());
-    ASSERT_TRUE(u.entries == t.wentries);
+    ASSERT_EQ(u.offset, t.woffset);
+
+    EntryVec_ASSERT_EQ(u.entries, t.wentries);
+  }
+}
+
+TEST(Unstable, Restore) {
+  Unstable u;
+  u.entries = {PBEntry().Index(5).Term(1).v};
+  u.offset = 6;
+
+  auto snap = PBSnapshot().MetaIndex(4).MetaTerm(1).v;
+  u.Restore(snap);
+
+  ASSERT_EQ(u.offset, 5);
+  ASSERT_EQ(u.entries.size(), 0);
+}
+
+TEST(Unstable, MaybeTerm) {
+  struct TestData {
+    std::vector<pb::Entry> entries;
+    uint64_t offset;
+    pb::Snapshot* snap;
+    uint64_t index;
+
+    uint64_t wterm;
+  } tests[] = {
+      // term from entries
+      {
+          {PBEntry().Index(5).Term(1).v}, 5, nullptr, 5, 1,
+      },
+      {
+          {PBEntry().Index(5).Term(1).v}, 5, nullptr, 6, 0,
+      },
+      {
+          {PBEntry().Index(5).Term(1).v}, 5, nullptr, 4, 0,
+      },
+      {
+          {PBEntry().Index(5).Term(1).v},
+          5,
+          new pb::Snapshot(PBSnapshot().MetaIndex(4).MetaTerm(1).v),
+          5,
+          1,
+      },
+      {
+          {PBEntry().Index(5).Term(1).v},
+          5,
+          new pb::Snapshot(PBSnapshot().MetaIndex(4).MetaTerm(1).v),
+          6,
+          0,
+      },
+      // term from snapshot
+      {
+          {PBEntry().Index(5).Term(1).v},
+          5,
+          new pb::Snapshot(PBSnapshot().MetaIndex(4).MetaTerm(1).v),
+          4,
+          1,
+      },
+      {
+          {PBEntry().Index(5).Term(1).v},
+          5,
+          new pb::Snapshot(PBSnapshot().MetaIndex(4).MetaTerm(1).v),
+          3,
+          0,
+      },
+      {
+          {}, 5, new pb::Snapshot(PBSnapshot().MetaIndex(4).MetaTerm(1).v), 5, 0,
+      },
+      {
+          {}, 5, new pb::Snapshot(PBSnapshot().MetaIndex(4).MetaTerm(1).v), 4, 1,
+      },
+      {
+          {}, 0, nullptr, 5, 0,
+      },
+  };
+
+  for (auto t : tests) {
+    Unstable u;
+    u.offset = t.offset;
+    u.entries = t.entries;
+    u.snapshot.reset(t.snap);
+
+    ASSERT_EQ(u.MaybeTerm(t.index), t.wterm);
   }
 }
