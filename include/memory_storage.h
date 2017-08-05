@@ -29,7 +29,6 @@ namespace yaraft {
 
 // MemoryStorage implements the Storage interface backed by an
 // in-memory array.
-// NOTE: MemoryStorage will only be used in tests.
 //
 // Thread-safe.
 class MemoryStorage : public Storage {
