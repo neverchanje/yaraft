@@ -13,13 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "raft_log.h"
 #include "memory_storage.h"
+#include "raft_log.h"
 #include "test_utils.h"
 
 #include <gtest/gtest.h>
 
 using namespace yaraft;
+
+uint64_t mustTerm(const RaftLog& log, uint64_t index) {
+  auto s = log.Term(index);
+  if (!s.IsOK()) {
+    return 0;
+  }
+  return s.GetValue();
+}
 
 TEST(RaftLog, IsUpToDate) {}
 
@@ -44,6 +52,38 @@ TEST(RaftLog, Term) {
 
   for (auto t : tests) {
     ASSERT_EQ(mustTerm(log, t.index), t.wterm) << t.index << " " << t.wterm;
+  }
+}
+
+TEST(RaftLog, TermWithUnstableSnapshot) {
+  uint64_t storageSnapshotIndex = 100;
+  uint64_t unstableSnapshotIndex = storageSnapshotIndex + 5;
+
+  auto snap = PBSnapshot().MetaIndex(storageSnapshotIndex).MetaTerm(1).v;
+  auto storage = new MemoryStorage;
+  storage->ApplySnapshot(snap);
+
+  RaftLog log(storage);
+  snap = PBSnapshot().MetaIndex(unstableSnapshotIndex).MetaTerm(1).v;
+  log.Restore(snap);
+
+  struct TestData {
+    uint64_t index;
+    uint64_t wterm;
+  } tests[] = {
+      // cannot get term from storage
+      {storageSnapshotIndex, 0},
+
+      // cannot get term from the gap between storage ents and unstable snapshot
+      {storageSnapshotIndex + 1, 0},
+      {unstableSnapshotIndex - 1, 0},
+
+      // get term from unstable snapshot index
+      {unstableSnapshotIndex, 1},
+  };
+
+  for (auto t : tests) {
+    ASSERT_EQ(mustTerm(log, t.index), t.wterm);
   }
 }
 
@@ -75,11 +115,9 @@ TEST(RaftLog, Append) {
     uint64_t index = log.LastIndex();
     ASSERT_EQ(index, t.windex);
 
-    EntryVec ents;
     auto s = log.Entries(1, log.LastIndex() + 1, noLimit);
-    ASSERT_TRUE(s.OK());
-    ents = s.GetValue();
-    ASSERT_TRUE(ents == t.wents);
+    ASSERT_TRUE(s.IsOK());
+    EntryVec_ASSERT_EQ(s.GetValue(), t.wents);
   }
 }
 
@@ -122,7 +160,7 @@ TEST(RaftLog, Entries) {
       ASSERT_EQ(s.GetStatus().Code(), Error::LogCompacted);
       continue;
     }
-    ASSERT_TRUE(s.GetValue() == t.w);
+    EntryVec_ASSERT_EQ(s.GetValue(), t.w);
   }
 }
 
@@ -185,12 +223,71 @@ TEST(RaftLog, MaybeAppend) {
       ASSERT_EQ(t.wappend, append);
       if (append && !t.ents.empty()) {
         auto s = log.Entries(log.LastIndex() - t.ents.size() + 1, log.LastIndex() + 1, noLimit);
-        ASSERT_TRUE(s.OK());
-        ASSERT_TRUE(s.GetValue() == t.ents);
+        ASSERT_TRUE(s.IsOK());
+        EntryVec_ASSERT_EQ(s.GetValue(), t.ents);
       }
-    } catch (RaftError &e) {
+    } catch (RaftError& e) {
       panic = true;
     }
     ASSERT_EQ(panic, t.wpanic);
+  }
+}
+
+TEST(RaftLog, Restore) {
+  uint64_t index = 1000;
+  uint64_t term = 1000;
+
+  auto snap = PBSnapshot().MetaIndex(index).MetaTerm(term).v;
+
+  auto storage = new MemoryStorage;
+  storage->ApplySnapshot(snap);
+
+  RaftLog log(storage);
+  ASSERT_EQ(log.CommitIndex(), index);
+  ASSERT_EQ(log.GetUnstable().offset, index + 1);
+  ASSERT_EQ(log.Term(index).GetValue(), term);
+}
+
+TEST(RaftLog, Compaction) {
+  struct TestData {
+    uint64_t lastIndex;
+    std::vector<uint64_t> compact;
+
+    std::vector<int> wleft;
+    bool wallow;
+  } tests[] = {
+      // out of upper bound
+      {1000, {1001}, {-1}, false},
+      {1000, {300, 500, 800, 900}, {700, 500, 200, 100}, true},
+
+      // out of lower bound
+      {1000, {300, 299}, {700, -1}, false},
+  };
+
+  for (auto t : tests) {
+    auto storage = new MemoryStorage;
+    for (uint64_t i = 1; i <= t.lastIndex; i++) {
+      storage->Append(PBEntry().Index(i).Term(1).v);
+    }
+
+    RaftLog log(storage);
+    if (log.ZeroTermOnErrCompacted(t.lastIndex) == 1) {
+      log.CommitTo(t.lastIndex);
+    }
+    log.ApplyTo(log.CommitIndex());
+
+    try {
+      for (int i = 0; i < t.compact.size(); i++) {
+        Status s = storage->Compact(t.compact[i]);
+        if (!s.IsOK()) {
+          ASSERT_FALSE(t.wallow);
+        } else {
+          ASSERT_EQ(log.AllEntries().size(), t.wleft[i]);
+        }
+      }
+    } catch (std::exception& e) {
+      LOG(ERROR) << e.what();
+      ASSERT_FALSE(t.wallow);
+    }
   }
 }

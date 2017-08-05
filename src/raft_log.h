@@ -32,11 +32,17 @@ class RaftLog {
  public:
   explicit RaftLog(Storage* storage) : storage_(storage), lastApplied_(0) {
     auto s = storage_->FirstIndex();
-    if (!s.GetStatus().OK()) {
-      LOG(FATAL) << s.GetStatus();
-    }
-    auto firstIndex = s.GetValue();
+    FATAL_NOT_OK(s, "Storage::FirstIndex");
+
+    uint64_t firstIndex = s.GetValue();
     commitIndex_ = firstIndex - 1;
+    lastApplied_ = firstIndex - 1;
+
+    s = storage_->LastIndex();
+    FATAL_NOT_OK(s, "Storage::LastIndex");
+
+    uint64_t lastIndex = s.GetValue();
+    unstable_.offset = lastIndex + 1;
   }
 
   // Raft determines which of two logs is more up-to-date
@@ -60,13 +66,13 @@ class RaftLog {
       return Status::Make(Error::OutOfBound);
     }
 
-    auto pTerm = unstable_.MaybeTerm(index);
-    if (pTerm) {
-      return pTerm.get();
+    uint64_t term = unstable_.MaybeTerm(index);
+    if (term) {
+      return term;
     }
 
     auto s = storage_->Term(index);
-    if (s.OK()) {
+    if (s.IsOK()) {
       return s.GetValue();
     }
 
@@ -81,28 +87,32 @@ class RaftLog {
   }
 
   uint64_t LastIndex() const {
-    if (!unstable_.Empty()) {
+    if (!unstable_.entries.empty()) {
       return unstable_.entries.rbegin()->index();
+    } else if (unstable_.snapshot) {
+      return unstable_.snapshot->metadata().index();
     } else {
       auto s = storage_->LastIndex();
-      if (!s.OK()) {
+      if (!s.IsOK()) {
         LOG(FATAL) << s.GetStatus();
       }
       return s.GetValue();
     }
   }
 
-  uint64_t LastTerm() const {
-    auto s = Term(LastIndex());
-    if (!s.OK()) {
-      LOG(FATAL) << s.GetStatus();
+  uint64_t FirstIndex() const {
+    if (unstable_.snapshot) {
+      // unstable snapshot always precedes all the entries in RaftLog.
+      return unstable_.snapshot->metadata().index() + 1;
     }
-    return s.GetValue();
+    auto sw = storage_->FirstIndex();
+    FATAL_NOT_OK(sw, "Storage::FirstIndex");
+    return sw.GetValue();
   }
 
-  uint64_t FirstIndex() const {
-    auto s = storage_->FirstIndex();
-    if (!s.OK()) {
+  uint64_t LastTerm() const {
+    auto s = Term(LastIndex());
+    if (!s.IsOK()) {
       LOG(FATAL) << s.GetStatus();
     }
     return s.GetValue();
@@ -110,7 +120,7 @@ class RaftLog {
 
   bool HasEntry(uint64_t index, uint64_t term) {
     auto s = Term(index);
-    if (s.OK()) {
+    if (s.IsOK()) {
       return s.GetValue() == term;
     }
     return false;
@@ -135,7 +145,8 @@ class RaftLog {
 
     if (begin->index() <= commitIndex_) {
 #ifdef BUILD_TESTS
-      throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(), commitIndex_);
+      throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(),
+                      commitIndex_);
 #else
       FMT_LOG(FATAL, "Append a committed entry at {:d}, committed: {:d}", begin->index(),
               commitIndex_);
@@ -208,12 +219,12 @@ class RaftLog {
     LOG_ASSERT(hi <= li + 1) << fmt::format(" slice[{:d},{:d}) out of bound [{:d},{:d}]", lo, hi,
                                             fi, li);
 
-    uint64_t uOffset = UnstableOffset();
+    uint64_t uOffset = unstable_.offset;
 
     EntryVec ret;
     if (lo < uOffset) {
       auto s = storage_->Entries(lo, std::min(hi, uOffset), &maxSize);
-      if (!s.OK()) {
+      if (!s.IsOK()) {
         return s.GetStatus();
       }
       ret = std::move(s.GetValue());
@@ -240,20 +251,22 @@ class RaftLog {
     return ret;
   }
 
-  // Returns the left bound index of entries in unstable_.
-  uint64_t UnstableOffset() const {
-    auto s = storage_->LastIndex();
-    LOG_ASSERT(s.GetStatus().OK());
-    return unstable_.Empty() ? s.GetValue() + 1 : unstable_.FirstIndex();
-  }
-
   uint64_t LastApplied() const {
     return lastApplied_;
   }
 
-  uint64_t ZeroTermOnErrCompacted(uint64_t index) {
+  void ApplyTo(uint64_t i) {
+    LOG_ASSERT(i != 0);
+    if (commitIndex_ < i || i < lastApplied_) {
+      FMT_LOG(FATAL, "applied(%d) is out of range [prevApplied(%d), committed(%d)]", i,
+              lastApplied_, commitIndex_);
+    }
+    lastApplied_ = i;
+  }
+
+  uint64_t ZeroTermOnErrCompacted(uint64_t index) const {
     auto st = Term(index);
-    if (!st.OK()) {
+    if (!st.IsOK()) {
       if (st.GetStatus().Code() == Error::LogCompacted) {
         return 0;
       }
@@ -262,12 +275,35 @@ class RaftLog {
     return st.GetValue();
   }
 
+  // REQUIRED: snap.metadata().index > CommittedIndex
+  // REQUIRED: there's no existing log entry the same as {index: snap.metadata.index, term:
+  // snap.metadata.term}.
+  void Restore(pb::Snapshot& snap) {
+    FMT_SLOG(INFO, "log [%s] starts to restore snapshot [index: %d, term: %d]", ToString(),
+             snap.metadata().index(), snap.metadata().term());
+    commitIndex_ = snap.metadata().index();
+    unstable_.Restore(snap);
+  }
+
+  // TODO: use shared_ptr to reduce copying
+  StatusWith<pb::Snapshot> Snapshot() const {
+    if (unstable_.snapshot) {
+      return *unstable_.snapshot;
+    }
+    return storage_->Snapshot();
+  }
+
+  std::string ToString() const {
+    return fmt::sprintf("committed=%d, applied=%d, unstable.offset=%d, len(unstable.Entries)=%d",
+                        commitIndex_, lastApplied_, unstable_.offset, unstable_.entries.size());
+  }
+
  public:
   /// Used with caution
 
   EntryVec AllEntries() {
     auto s = Entries(FirstIndex(), LastIndex() + 1, std::numeric_limits<uint64_t>::max());
-    if (!s.OK()) {
+    if (!s.IsOK()) {
       DLOG(FATAL) << s.GetStatus();
     }
     return s.GetValue();
@@ -275,10 +311,6 @@ class RaftLog {
 
   Unstable& GetUnstable() {
     return unstable_;
-  }
-
-  Storage* GetStorage() {
-    return storage_.get();
   }
 
  private:
