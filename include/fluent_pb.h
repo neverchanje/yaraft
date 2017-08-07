@@ -82,7 +82,7 @@ struct PBMessage {
     return *this;
   }
 
-  PBMessage& Snapshot(pb::Snapshot &snap) {
+  PBMessage& Snapshot(pb::Snapshot& snap) {
     auto s = new pb::Snapshot();
     s->Swap(&snap);
     v.set_allocated_snapshot(s);
@@ -131,7 +131,7 @@ struct PBSnapshot {
 
   PBSnapshot& MetaConfState(std::vector<uint64_t> nodes) {
     auto conf = new pb::ConfState;
-    for(uint64_t n : nodes)
+    for (uint64_t n : nodes)
       conf->add_nodes(n);
     v.mutable_metadata()->set_allocated_conf_state(conf);
     return *this;
