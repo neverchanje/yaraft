@@ -9,16 +9,16 @@ yaraft is a migration of [etcd/raft](https://github.com/coreos/etcd/tree/master/
 - [x] Log Replication
 - [x] PreVote
 - [ ] CheckQuorum
-- [ ] Log Compaction / InstallSnapshot
+- [x] Log Compaction / InstallSnapshot
 - [ ] Flow Control
-- [ ] Restart
 - [x] Single-Node Cluster
 - [ ] Read-only
 - [ ] Leader Transfer
+- [ ] Reconfiguration
 
 ## Installation
 
-```
+```bash
 sudo apt-get -y install libboost-dev
 bash install_deps_if_neccessary.sh
 cd build && cmake .. && make && make install
