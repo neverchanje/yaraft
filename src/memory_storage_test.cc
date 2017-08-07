@@ -41,7 +41,7 @@ TEST(MemoryStorage, Term) {
     auto result = storage->Term(t.i);
     ASSERT_EQ(result.GetStatus().Code(), t.werr);
 
-    if (result.OK())
+    if (result.IsOK())
       ASSERT_EQ(result.GetValue(), t.wterm);
   }
 }
@@ -103,9 +103,9 @@ TEST(MemoryStorage, Entries) {
 
     auto status = storage->Entries(t.lo, t.hi, &t.maxSize);
     ASSERT_EQ(status.GetStatus().Code(), t.werr);
-    if (status.OK()) {
+    if (status.IsOK()) {
       const EntryVec& vec = status.GetValue();
-      ASSERT_TRUE(vec == t.went);
+      EntryVec_ASSERT_EQ(vec, t.went);
     }
 
     uint64_t totSize = 0;
@@ -161,6 +161,6 @@ TEST(MemoryStorage, Append) {
     storage->TEST_Entries() << pbEntry(3, 3) << pbEntry(4, 4) << pbEntry(5, 5);
     storage->Append(t.entries);
 
-    ASSERT_TRUE(storage->TEST_Entries() == t.went);
+    EntryVec_ASSERT_EQ(storage->TEST_Entries(), t.went);
   }
 }
