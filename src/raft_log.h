@@ -258,8 +258,8 @@ class RaftLog {
   void ApplyTo(uint64_t i) {
     LOG_ASSERT(i != 0);
     if (commitIndex_ < i || i < lastApplied_) {
-      FMT_LOG(FATAL, "applied(%d) is out of range [prevApplied(%d), committed(%d)]", i,
-              lastApplied_, commitIndex_);
+      FMT_SLOG(FATAL, "applied(%d) is out of range [prevApplied(%d), committed(%d)]", i,
+               lastApplied_, commitIndex_);
     }
     lastApplied_ = i;
   }
@@ -270,7 +270,7 @@ class RaftLog {
       if (st.GetStatus().Code() == Error::LogCompacted) {
         return 0;
       }
-      LOG(FATAL) << st.GetStatus();
+      FMT_LOG(FATAL, "fail to get term for index: {}, error: {}", index, st.ToString());
     }
     return st.GetValue();
   }

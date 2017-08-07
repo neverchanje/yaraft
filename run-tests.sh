@@ -22,3 +22,4 @@ run unstable_test
 run util_test
 run progress_test
 run raw_node_test
+run raft_snap_test

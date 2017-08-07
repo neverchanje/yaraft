@@ -250,6 +250,12 @@ class Raft {
       case pb::MsgHeartbeatResp:
         handleMsgHeartbeatResp(m);
         break;
+      case pb::MsgSnapStatus:
+        handleMsgSnapStatus(m);
+        break;
+      case pb::MsgUnreachable:
+        handleMsgUnreachable(m);
+        break;
       default:
         // ignore unexpected messages
         break;
@@ -499,8 +505,12 @@ class Raft {
     }
   }
 
+  // REQUIRED: `to` is an valid peer.
   void sendAppend(uint64_t to) {
-    const auto& pr = prs_[to];
+    auto& pr = prs_[to];
+    if (pr.IsPaused()) {
+      return;
+    }
 
     PBMessage m;
     m.To(to);
@@ -517,16 +527,19 @@ class Raft {
     } else {
       // send snapshot if we failed to get term or entries
       pb::Snapshot snap = log_->Snapshot().GetValue();
-      if (!snap.IsInitialized()) {
+      if (IsEmptySnapshot(snap)) {
         FMT_SLOG(FATAL,
                  "%x failed to send snapshot to %x because snapshot is temporarily unavailable",
                  id_, to);
       }
 
       D_FMT_SLOG(INFO,
-                 "%x [lastindex: %d, commit: %d] sent snapshot[index: %d, term: %d] to %x [%s]",
-                 id_, log_->LastIndex(), log_->CommitIndex(), snap.metadata().index(),
+                 "%x [firstIndex: %d, commit: %d] sent snapshot[index: %d, term: %d] to %x [%s]",
+                 id_, log_->FirstIndex(), log_->CommitIndex(), snap.metadata().index(),
                  snap.metadata().term(), to, pr.ToString());
+
+      pr.BecomeSnapshot(snap.metadata().index());
+      D_FMT_SLOG(INFO, "%x paused sending replication messages to %x [%s]", id_, to, pr.ToString());
 
       m.Type(pb::MsgSnap).Snapshot(snap);
     }
@@ -572,6 +585,12 @@ class Raft {
       if (pr.MaybeUpdate(m.index())) {
         advanceCommitIndex();
       }
+
+      if (pr.State() == Progress::StateSnapshot && pr.NeedSnapshotAbort()) {
+        D_FMT_SLOG(INFO, "%x snapshot aborted, resumed sending replication messages to %x [%s]",
+                   id_, m.from(), pr.ToString());
+        pr.BecomeProbe();
+      }
     }
   }
 
@@ -605,6 +624,9 @@ class Raft {
   }
 
   void handleMsgPropLeader(pb::Message& m) {
+    if (UNLIKELY(m.entries().empty())) {
+      FMT_SLOG(FATAL, "%x stepped empty MsgProp", id_);
+    }
     appendRawEntries(m);
     bcastAppend();
   }
@@ -746,10 +768,43 @@ class Raft {
     } else {
       FMT_SLOG(INFO, "%x [commit: %d] ignored snapshot [index: %d, term: %d]", id_,
                log_->CommitIndex(), sindex, sterm);
-
-      // ignore but not reject
       send(PBMessage().Type(pb::MsgAppResp).To(m.from()).Index(log_->CommitIndex()).v);
     }
+  }
+
+  void handleMsgSnapStatus(pb::Message& m) {
+    Progress& pr = prs_[m.from()];
+    if (pr.State() != Progress::StateSnapshot) {
+      return;
+    }
+
+    if (!m.reject()) {
+      pr.BecomeProbe();
+      D_FMT_SLOG(INFO, "%x snapshot succeeded, resumed sending replication messages to %x [%s]",
+                 id_, m.from(), pr.ToString());
+    } else {
+      pr.SnapshotFailure();
+      pr.BecomeProbe();
+      D_FMT_SLOG(INFO, "%x snapshot failed, resumed sending replication messages to %x [%s]", id_,
+                 m.from(), pr.ToString());
+    }
+
+    // If snapshot finish, wait for the msgAppResp from the remote node before sending
+    // out the next msgApp.
+    // If snapshot failure, wait for a heartbeat interval before next try
+    pr.Pause();
+  }
+
+  void handleMsgUnreachable(pb::Message& m) {
+    Progress& pr = prs_[m.from()];
+
+    // During optimistic replication, if the remote becomes unreachable,
+    // there is huge probability that a MsgApp is lost.
+    if (pr.State() == Progress::StateReplicate) {
+      pr.BecomeProbe();
+    }
+    D_FMT_SLOG(INFO, "%x failed to send message to %x because it is unreachable [%s]", id_,
+               m.from(), pr.ToString());
   }
 
  private:

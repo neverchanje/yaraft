@@ -21,6 +21,7 @@
 
 #include "inflights.h"
 
+#include <fmt/format.h>
 #include <glog/logging.h>
 
 namespace yaraft {
@@ -56,7 +57,45 @@ class Progress {
     return *this;
   }
 
-  Progress& IngflightWindow(int size);
+  // RecentActive is true if the progress is recently active. Receiving any messages
+  // from the corresponding follower indicates the progress is active.
+  // RecentActive can be reset to false after an election timeout.
+  bool RecentActive() const {
+    return recentActive_;
+  }
+
+  // PendingSnapshot is used in ProgressStateSnapshot.
+  // If there is a pending snapshot, the pendingSnapshot will be set to the
+  // index of the snapshot. If pendingSnapshot is set, the replication process of
+  // this Progress will be paused. raft will not resend snapshot until the pending one
+  // is reported to be failed.
+  uint64_t PendingSnapshot() const {
+    return pendingSnapshot_;
+  }
+
+  // IsPaused returns whether sending log entries to this node has been
+  // paused. A node may be paused because it has rejected recent
+  // MsgApps, is currently waiting for a snapshot, or has reached the
+  // MaxInflightMsgs limit.
+  bool IsPaused() const {
+    switch (state_) {
+      case StateProbe:
+        return paused_;
+      case StateSnapshot:
+        return true;
+      default:
+        LOG(FATAL) << "unexpected state";
+        break;
+    }
+  }
+
+  StateType State() const {
+    return state_;
+  }
+
+  bool NeedSnapshotAbort() const {
+    return state_ == StateSnapshot && match_ >= pendingSnapshot_;
+  }
 
   // MaybeDecrTo returns true if nextIndex is decremented.
   bool MaybeDecrTo(uint64_t rejected, uint64_t lastIndex) {
@@ -102,16 +141,63 @@ class Progress {
 
   std::string ToString() const {
     static const char* stateTypeName[] = {"StateProbe", "StateReplicate", "StateSnapshot"};
-    std::stringstream ss;
-    ss << "{next: " << next_ << ", match: " << match_ << ", state: " << stateTypeName[state_]
-       << "}";
-    return ss.str();
+    return fmt::sprintf("next = %d, match = %d, state = %s, waiting = %s, pendingSnapshot = %d",
+                        next_, match_, stateTypeName[state_], IsPaused(), pendingSnapshot_);
+  }
+
+  void BecomeReplicate() {
+    state_ = StateReplicate;
+    paused_ = false;
+    pendingSnapshot_ = 0;
+    next_ = match_ + 1;
+  }
+
+  void BecomeSnapshot(uint64_t snapLastIndex) {
+    state_ = StateSnapshot;
+    paused_ = false;
+    pendingSnapshot_ = snapLastIndex;
+  }
+
+  void BecomeProbe() {
+    // If the original state is ProgressStateSnapshot, progress knows that
+    // the pending snapshot has been sent to this peer successfully, then
+    // probes from pendingSnapshot + 1.
+    if (state_ == StateSnapshot) {
+      next_ = std::max(pendingSnapshot_ + 1, match_ + 1);
+    } else {
+      next_ = match_ + 1;
+    }
+
+    paused_ = false;
+    pendingSnapshot_ = 0;
+    state_ = StateProbe;
+  }
+
+  void Pause() {
+    paused_ = true;
+  }
+
+  void Resume() {
+    paused_ = false;
+  }
+
+  // cancel the snapshot
+  void SnapshotFailure() {
+    pendingSnapshot_ = 0;
   }
 
  private:
   uint64_t next_;
   uint64_t match_;
   StateType state_;
+
+  bool recentActive_;
+
+  // Paused is used in ProgressStateProbe.
+  // When Paused is true, raft should pause sending replication message to this peer.
+  bool paused_;
+
+  uint64_t pendingSnapshot_;
 
   // inflights is a sliding window for the inflight messages.
   // Each inflight message contains one or more log entries.
