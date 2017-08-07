@@ -274,8 +274,8 @@ static uint64_t noLimit = std::numeric_limits<uint64_t>::max();
 
 #define EntryVec_ASSERT_EQ(expected, actual)     \
   do {                                           \
-    auto& _expected = (expected);                \
-    auto& _actual = (actual);                    \
+    auto _expected = (expected);                 \
+    auto _actual = (actual);                     \
     ASSERT_EQ(_expected.size(), _actual.size()); \
     for (int i = 0; i < _expected.size(); i++) { \
       Entry_ASSERT_EQ(_expected[i], _actual[i]); \
