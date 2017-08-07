@@ -23,7 +23,7 @@ namespace yaraft {
 typedef std::vector<pb::Entry> EntryVec;
 
 inline bool IsLocalMsg(const pb::Message& m) {
-  if(!m.has_from()) {
+  if (!m.has_from()) {
     return true;
   }
   return m.from() == m.to();
@@ -39,6 +39,11 @@ inline bool IsResponseMsg(const pb::Message& m) {
     default:
       return false;
   }
+}
+
+// NOTE: use IsEmptySnapshot instead of snap.IsInitialized.
+inline bool IsEmptySnapshot(const pb::Snapshot& snap) {
+  return snap.metadata().index() == 0;
 }
 
 pb::MessageType GetResponseType(pb::MessageType type);
