@@ -82,3 +82,51 @@ TEST(Progress, MaybeDecrTo) {
     ASSERT_EQ(p.NextIndex(), t.wn) << p;
   }
 }
+
+TEST(Progress, BecomeProbe) {
+  struct TestData {
+    Progress p;
+
+    uint64_t wnext;
+  } tests[] = {
+      {
+          Progress().State(Progress::StateReplicate).NextIndex(5).MatchIndex(1), 2,
+      },
+
+      {
+          // snapshot finish
+          Progress().State(Progress::StateSnapshot).NextIndex(5).PendingSnapshot(10), 11,
+      },
+
+      {
+          // snapshot failure
+          Progress().State(Progress::StateSnapshot).NextIndex(5).MatchIndex(1).PendingSnapshot(0),
+          2,
+      },
+  };
+
+  for (auto t : tests) {
+    t.p.BecomeProbe();
+
+    ASSERT_EQ(t.p.State(), Progress::StateProbe);
+    ASSERT_EQ(t.p.NextIndex(), t.wnext);
+  }
+}
+
+TEST(Progress, BecomeReplicate) {
+  auto p = Progress().State(Progress::StateProbe).MatchIndex(1).NextIndex(5);
+  p.BecomeReplicate();
+
+  ASSERT_EQ(p.State(), Progress::StateReplicate);
+  ASSERT_EQ(p.NextIndex(), 2);
+  ASSERT_EQ(p.MatchIndex(), 1);
+}
+
+TEST(Progress, BecomeSnapshot) {
+  auto p = Progress().State(Progress::StateProbe).MatchIndex(1).NextIndex(5);
+  p.BecomeSnapshot(10);
+
+  ASSERT_EQ(p.State(), Progress::StateSnapshot);
+  ASSERT_EQ(p.MatchIndex(), 1);
+  ASSERT_EQ(p.PendingSnapshot(), 10);
+}

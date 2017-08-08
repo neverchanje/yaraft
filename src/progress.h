@@ -30,7 +30,7 @@ class Progress {
  public:
   Progress() = default;
 
-  enum StateType { StateProbe, StateReplicate, StateSnapshot };
+  enum StateType { StateProbe = 0, StateReplicate, StateSnapshot };
 
   // The index of the next log entry the leader will send to the follower.
   uint64_t NextIndex() const {
@@ -71,6 +71,11 @@ class Progress {
   // is reported to be failed.
   uint64_t PendingSnapshot() const {
     return pendingSnapshot_;
+  }
+
+  Progress& PendingSnapshot(uint64_t pending) {
+    pendingSnapshot_ = pending;
+    return *this;
   }
 
   // IsPaused returns whether sending log entries to this node has been
