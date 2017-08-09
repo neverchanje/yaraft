@@ -152,3 +152,40 @@ TEST(Progress, IsPaused) {
     ASSERT_EQ(p.IsPaused(), t.wpause);
   }
 }
+
+TEST(Progress, Update) {
+  uint64_t prevM = 3, prevN = 5;
+  struct TestData {
+    uint64_t update;
+
+    uint64_t wm;
+    uint64_t wn;
+    bool wok;
+  } tests[] = {
+      {prevM - 1, prevM, prevN, false},         // do not decrease match, next
+      {prevM, prevM, prevN, false},             // do not decrease next
+      {prevM + 1, prevM + 1, prevN, true},      // increase match, do not decrease next
+      {prevM + 2, prevM + 2, prevN + 1, true},  // increase match, next
+  };
+  for (auto tt : tests) {
+    auto p = Progress().MatchIndex(prevM).NextIndex(prevN);
+    bool ok = p.MaybeUpdate(tt.update);
+
+    ASSERT_EQ(ok, tt.wok);
+    ASSERT_EQ(p.MatchIndex(), tt.wm);
+    ASSERT_EQ(p.NextIndex(), tt.wn);
+  }
+}
+
+// TestProgress` ensures that progress.maybeUpdate and progress.maybeDecrTo
+// will reset progress.paused.
+TEST(Progess, Resume) {
+  auto p = Progress().NextIndex(2);
+  p.Pause();
+  p.MaybeDecrTo(1, 1);
+  ASSERT_FALSE(p.IsPaused());
+
+  p.Pause();
+  p.MaybeUpdate(2);
+  ASSERT_FALSE(p.IsPaused());
+}

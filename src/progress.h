@@ -64,6 +64,7 @@ class Progress {
 
   Progress& RecentActive(bool val) {
     recentActive_ = val;
+    return *this;
   }
 
   // PendingSnapshot is used in ProgressStateSnapshot.
