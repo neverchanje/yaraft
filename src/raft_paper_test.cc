@@ -180,10 +180,11 @@ class RaftPaperTest {
 
       uint64_t wcommit;
     } tests[] = {
-        {1, 0},  // index 1 replicated on majority, but with older term = 1, currentTerm = 3
-        {2, 0},  // index 2 replicated on majority, but with older term = 2, currentTerm = 3
-
-        {3, 3},  // index 3 replicated on majority,
+        // do not commit log entries in previous terms
+        {1, 0},
+        {2, 0},
+        // commit log in current term
+        {3, 3},
     };
 
     for (auto t : tests) {
@@ -634,34 +635,30 @@ class RaftPaperTest {
               pbEntry(1, 1), pbEntry(2, 1), pbEntry(3, 1), pbEntry(4, 4), pbEntry(5, 4),
               pbEntry(6, 5), pbEntry(7, 5), pbEntry(8, 6), pbEntry(9, 6), pbEntry(10, 6),
           }));
-      lead->loadState(PBHardState().Term(8).v);
+      lead->loadState(PBHardState().Commit(lead->log_->LastIndex()).Term(8).v);
 
       auto follower = newTestRaft(2, {1, 2, 3}, 10, 1, new MemoryStorage(t.ents));
       follower->loadState(PBHardState().Term(7).v);
 
-      std::unique_ptr<Network> net(Network::New(3)->Down(3)->Set(lead)->Set(follower));
+      // It is necessary to have a three-node cluster.
+      // The second may have more up-to-date log than the first one, so the
+      // first node needs the vote from the third node to become the leader.
+      auto follower3 = newTestRaft(3, {1, 2, 3}, 10, 1, new MemoryStorage);
+      std::unique_ptr<Network> net(Network::New(3)->Set(lead)->Set(follower)->Set(follower3));
 
       // Elect 1 as leader.
-      net->Send(PBMessage().From(1).To(1).Type(pb::MsgHup).v);
-      net->Send(net->MustTake(1, 2, pb::MsgVote));
-      net->Send(net->MustTake(1, 3, pb::MsgVote));
-      net->Send(net->MustTake(2, 1, pb::MsgVoteResp));
-      net->Send(PBMessage().From(3).To(1).Type(pb::MsgVoteResp).Term(9).v);
+      net->StartElection(1);
+      ASSERT_EQ(net->Peer(1)->role_, Raft::kLeader);
 
-      while (true) {
-        // retry if app rejected
-        auto m = net->MustTake(1, 2, pb::MsgApp);
-        net->Send(m);
-        m = net->MustTake(2, 1, pb::MsgAppResp);
-        net->Send(m);
-        if (!m.reject()) {
-          break;
-        }
-      }
+      net->Propose(1);
 
-      auto followerEnts = follower->log_->Entries(follower->log_->FirstIndex(), noLimit);
-      auto leadEnts = lead->log_->Entries(lead->log_->FirstIndex(), noLimit);
-      EntryVec_ASSERT_EQ(followerEnts.GetValue(), leadEnts.GetValue());
+      ASSERT_EQ(net->Peer(1)->log_->LastIndex(), 12);
+      ASSERT_EQ(net->Peer(3)->log_->LastIndex(), 12);
+      ASSERT_EQ(net->Peer(1)->log_->CommitIndex(), 12);
+
+      auto followerEnts = follower->log_->AllEntries();
+      auto leadEnts = lead->log_->AllEntries();
+      EntryVec_ASSERT_EQ(followerEnts, leadEnts);
     }
   }
 

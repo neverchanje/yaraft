@@ -77,9 +77,9 @@ TEST(Progress, MaybeDecrTo) {
     Progress p;
     p.State(t.state).MatchIndex(t.match).NextIndex(t.next);
 
-    ASSERT_EQ(p.MaybeDecrTo(t.rejected, t.last), t.w) << p;
-    ASSERT_EQ(p.MatchIndex(), t.match) << p;
-    ASSERT_EQ(p.NextIndex(), t.wn) << p;
+    ASSERT_EQ(p.MaybeDecrTo(t.rejected, t.last), t.w);
+    ASSERT_EQ(p.MatchIndex(), t.match);
+    ASSERT_EQ(p.NextIndex(), t.wn);
   }
 }
 
@@ -129,4 +129,26 @@ TEST(Progress, BecomeSnapshot) {
   ASSERT_EQ(p.State(), Progress::StateSnapshot);
   ASSERT_EQ(p.MatchIndex(), 1);
   ASSERT_EQ(p.PendingSnapshot(), 10);
+}
+
+TEST(Progress, IsPaused) {
+  struct TestData {
+    Progress::StateType state;
+    bool pause;
+
+    bool wpause;
+    uint64_t wn;
+  } tests[] = {
+      {Progress::StateProbe, false, false},     {Progress::StateProbe, true, true},
+      {Progress::StateReplicate, false, false}, {Progress::StateReplicate, true, false},
+      {Progress::StateSnapshot, false, true},   {Progress::StateSnapshot, true, true},
+  };
+
+  for (auto t : tests) {
+    auto p = Progress().State(t.state);
+    if (t.pause) {
+      p.Pause();
+    }
+    ASSERT_EQ(p.IsPaused(), t.wpause);
+  }
 }

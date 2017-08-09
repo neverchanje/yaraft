@@ -433,13 +433,8 @@ class RaftTest {
   static void TestSingleNodeCommit() {
     std::unique_ptr<Network> n(Network::New(1));
     n->StartElection(1);
-    n->ReplicateAppend(1);
-
-    n->Send(PBMessage().From(1).To(1).Type(pb::MsgProp).Entries({PBEntry().Data("somedata").v}).v);
-    n->ReplicateAppend(1);
-
-    n->Send(PBMessage().From(1).To(1).Type(pb::MsgProp).Entries({PBEntry().Data("somedata").v}).v);
-    n->ReplicateAppend(1);
+    n->Propose(1);
+    n->Propose(1);
 
     ASSERT_EQ(n->Peer(1)->log_->CommitIndex(), 3);
   }
@@ -451,11 +446,10 @@ class RaftTest {
       n->StartElection(1);
       ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
 
-      n->Send(PBMessage().Type(pb::MsgProp).From(1).To(1).Entries({PBEntry().Data("data").v}).v);
-      n->ReplicateAppend(1);
+      n->Propose(1);
 
       for (uint64_t i = 1; i <= 3; i++) {
-        ASSERT_EQ(n->Peer(i)->log_->CommitIndex(), 2) << " " << i;
+        ASSERT_EQ(n->Peer(i)->log_->CommitIndex(), 2);
       }
     }
 
@@ -465,14 +459,12 @@ class RaftTest {
       n->StartElection(1);
       ASSERT_EQ(n->Peer(1)->role_, Raft::kLeader);
 
-      n->Send(PBMessage().Type(pb::MsgProp).From(1).To(1).Entries({PBEntry().Data("data").v}).v);
-      n->ReplicateAppend(1);
+      n->Propose(1);
 
       n->StartElection(2);
       ASSERT_EQ(n->Peer(2)->role_, Raft::kLeader);
 
-      n->Send(PBMessage().Type(pb::MsgProp).From(2).To(2).Entries({PBEntry().Data("data").v}).v);
-      n->ReplicateAppend(2);
+      n->Propose(1);
 
       for (uint64_t i = 1; i <= 3; i++) {
         ASSERT_EQ(n->Peer(i)->log_->CommitIndex(), 4);
@@ -483,20 +475,18 @@ class RaftTest {
   static void TestProposalByProxy() {
     struct TestData {
       Network *network;
-    } tests[] = {{Network::New(3)}, {Network::New(3)->Down(3)}};
+    } tests[] = {
+        {Network::New(3)},
+        //{Network::New(3)->Down(3)}
+    };
     for (auto t : tests) {
       std::unique_ptr<Network> n(t.network);
 
-      // index = 1
+      // 1 starts election and becomes leader, lastIndex = 1
       n->StartElection(1);
 
-      n->Send(
-          PBMessage().From(2).To(2).Type(pb::MsgProp).Entries({PBEntry().Data("some data").v}).v);
-      auto prop = n->MustTake(2, 1, pb::MsgProp);
-      n->Send(prop);
-
-      // index = 2
-      n->ReplicateAppend(1);
+      // 2 will transfer the proposal to leader 1
+      n->Propose(2, "somedata");
 
       for (auto r : n->Peers()) {
         ASSERT_EQ(r->log_->CommitIndex(), 2);
@@ -504,7 +494,7 @@ class RaftTest {
         auto ev = r->log_->AllEntries();
         ASSERT_EQ(ev.size(), 2);
         Entry_ASSERT_EQ(ev[0], PBEntry().Term(1).Index(1).Data("").v);
-        Entry_ASSERT_EQ(ev[1], PBEntry().Term(1).Index(2).Data("some data").v);
+        Entry_ASSERT_EQ(ev[1], PBEntry().Term(1).Index(2).Data("somedata").v);
       }
     }
   }
@@ -584,6 +574,39 @@ class RaftTest {
 
     ASSERT_EQ(r->mails_.size(), 1);
     ASSERT_EQ(r->mails_[0].type(), pb::MsgSnap);
+  }
+
+  // TestProgressResumeByHeartbeatResp ensures raft.heartbeat reset progress.paused by heartbeat
+  // response.
+  static void TestProgressResumeByHeartbeatResp() {
+    RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, new MemoryStorage));
+    r->becomeCandidate();
+    r->becomeLeader();
+    r->prs_[2].Pause();
+
+    r->Step(PBMessage().From(1).To(1).Type(pb::MsgBeat).Term(1).v);
+    ASSERT_TRUE(r->prs_[2].IsPaused());
+
+    r->Step(PBMessage().From(2).To(1).Type(pb::MsgHeartbeatResp).Term(1).v);
+    ASSERT_FALSE(r->prs_[2].IsPaused());
+  }
+
+  static void TestProgressPaused() {
+    RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, new MemoryStorage));
+    r->becomeCandidate();
+    r->becomeLeader();
+
+    for (int i = 0; i < 3; i++) {
+      r->Step(PBMessage()
+                  .From(1)
+                  .To(1)
+                  .Term(1)
+                  .Type(pb::MsgProp)
+                  .Entries({PBEntry().Data("some data").v})
+                  .v);
+    }
+
+    ASSERT_EQ(r->mails_.size(), 1);
   }
 };
 
@@ -681,4 +704,12 @@ TEST(Raft, RestoreIgnoreSnapshot) {
 
 TEST(Raft, ProvideSnap) {
   RaftTest::TestProvideSnap();
+}
+
+TEST(Raft, ProgressResumeByHeartbeatResp) {
+  RaftTest::TestProgressResumeByHeartbeatResp();
+}
+
+TEST(Raft, ProgressPaused) {
+  RaftTest::TestProgressPaused();
 }

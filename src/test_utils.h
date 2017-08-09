@@ -59,104 +59,31 @@ struct Network {
   }
 
   void Send(pb::Message m) {
-    uint64_t to = m.to(), from = m.from();
+    msgs_.push_back(m);
+    while (!msgs_.empty()) {
+      m = msgs_.front();
+      msgs_.pop_front();
 
-    if (peers_.find(to) == peers_.end() || cutMap_[from] == to) {
-      return;
-    }
-
-    if (m.type() != pb::MsgVote && m.type() != pb::MsgPreVote) {
-      if (peers_.find(from) != peers_.end())
-        m.set_term(peers_[from]->currentTerm_);
-    }
-
-    peers_[to]->Step(m);
-
-    auto& responses = peers_[to]->mails_;
-    for (auto& resp : responses) {
-      mailTo_[resp.to()].emplace_back(std::move(resp));
-    }
-    responses.clear();
-  }
-
-  // take responses from mailbox
-  boost::optional<pb::Message> Take(uint64_t from, uint64_t to) {
-    if (mailTo_.empty())
-      return boost::none;
-
-    if (mailTo_.find(to) != mailTo_.end()) {
-      auto& msgs = mailTo_[to];
-      auto it = std::find_if(msgs.begin(), msgs.end(),
-                             [&](const pb::Message& m) { return m.from() == from; });
-      if (it != msgs.end()) {
-        pb::Message m = *it;
-        msgs.erase(it);
-        return boost::make_optional(m);
+      // Drop the message if the remote peer is dead or the connection to remote is cut down.
+      uint64_t to = m.to(), from = m.from();
+      if (peers_.find(to) == peers_.end() || cutMap_[from] == to) {
+        continue;
       }
+
+      peers_[to]->Step(m);
+      for (auto& msg : peers_[to]->mails_) {
+        msgs_.push_back(msg);
+      }
+      peers_[to]->mails_.clear();
     }
-    return boost::none;
   }
 
   void StartElection(uint64_t cand = 1) {
     Send(PBMessage().From(cand).To(cand).Type(pb::MsgHup).v);
-
-    if (Peer(cand)->c_->preVote) {
-      for (uint64_t id = 1; id <= PeerSize(); id++) {
-        if (id == cand)
-          continue;
-        TakeSingleRound(pb::MsgPreVote, cand, id);
-      }
-
-      // Leave if the election doesn't progress.
-      if (Peer(cand)->role_ != Raft::kCandidate) {
-        return;
-      }
-    }
-
-    for (uint64_t id = 1; id <= PeerSize(); id++) {
-      if (id == cand)
-        continue;
-      TakeSingleRound(pb::MsgVote, cand, id);
-    }
-
-    if (peers_[cand]->role_ == Raft::kLeader) {
-      ReplicateAppend(cand);
-    }
   }
 
-  void ReplicateAppend(uint64_t lead) {
-    for (uint64_t id = 1; id <= PeerSize(); id++) {
-      if (id == lead)
-        continue;
-      TakeSingleRound(pb::MsgApp, lead, id);
-    }
-
-    Send(PBMessage().From(lead).To(lead).Type(pb::MsgBeat).v);
-    for (uint64_t id = 1; id <= PeerSize(); id++) {
-      if (id == lead)
-        continue;
-      TakeSingleRound(pb::MsgHeartbeat, lead, id);
-    }
-  }
-
-  // Simulate a single round of request response.
-  void TakeSingleRound(pb::MessageType type, uint64_t from, uint64_t to) {
-    // Drop the request if the remote peer is dead or the connection to remote is cut down.
-    auto req = MustTake(from, to, type);
-    if (cutMap_[from] != to && peers_.find(to) != peers_.end()) {
-      Send(req);
-      auto resp = MustTake(to, from, GetResponseType(type));
-      Send(resp);
-    }
-  }
-
-  pb::Message MustTake(uint64_t from, uint64_t to, pb::MessageType type) {
-    auto m = Take(from, to);
-    auto err = fmt::format(" Message [from: {}, to: {}, type: {}] not exists ", from, to,
-                           pb::MessageType_Name(type));
-    DLOG_ASSERT(bool(m)) << err;
-    DLOG_ASSERT(m->type() == type) << err;
-    return *m;
+  void Propose(uint64_t id, std::string data = "somedata") {
+    Send(PBMessage().From(id).To(id).Type(pb::MsgProp).Entries({PBEntry().Data(data).v}).v);
   }
 
   static Network* New(uint64_t size) {
@@ -197,10 +124,6 @@ struct Network {
     }
   }
 
-  uint64_t PeerSize() const {
-    return size_;
-  }
-
   Network* Set(Raft* r) {
     if (peers_.find(r->Id()) != peers_.end()) {
       delete peers_[r->Id()];
@@ -233,6 +156,7 @@ struct Network {
 
   // to => Message
   std::unordered_map<uint64_t, std::list<pb::Message>> mailTo_;
+  std::list<pb::Message> msgs_;
 
   std::unordered_map<uint64_t, uint64_t> cutMap_;
 };

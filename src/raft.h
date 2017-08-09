@@ -83,15 +83,15 @@ class Raft {
   }
 
   Status Step(pb::Message& m) {
-    if (currentTerm_ > m.term()) {
+    if (m.term() == 0) {
+      // local message
+    } else if (currentTerm_ > m.term()) {
       // ignore the message
       LOG(INFO) << fmt::format(
           "{:x} [term: {:d}] ignored a {:s} message with lower term from {:x} [term: {:d}]", id_,
           currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
       return Status::OK();
-    }
-
-    if (currentTerm_ < m.term()) {
+    } else if (currentTerm_ < m.term()) {
       if (m.type() == pb::MsgPreVote) {
         // currentTerm never changes when receiving a PreVote.
       } else if (m.type() == pb::MsgPreVoteResp && !m.reject()) {
@@ -113,8 +113,6 @@ class Raft {
         becomeFollower(m.term(), lead);
       }
     }
-
-    DLOG_ASSERT(currentTerm_ <= m.term());
 
     switch (m.type()) {
       case pb::MsgHup:
@@ -420,8 +418,13 @@ class Raft {
   }
 
   void loadState(pb::HardState state) {
+    if (UNLIKELY(state.commit() > log_->LastIndex() || state.commit() < log_->CommitIndex())) {
+      D_FMT_SLOG(FATAL, "%x state.commit %d is out of range [%d, %d]", id_, state.commit(),
+                 log_->CommitIndex(), log_->LastIndex());
+    }
     currentTerm_ = state.term();
     votedFor_ = state.vote();
+    log_->CommitTo(state.commit());
   }
 
   void tickHeartbeat() {
@@ -521,11 +524,35 @@ class Raft {
 
     if (sTerm.IsOK() && sEnts.IsOK()) {
       uint64_t prevLogTerm = sTerm.GetValue();
-
       m.Entries(sEnts.GetValue());
       m.Type(pb::MsgApp).Index(prevLogIndex).LogTerm(prevLogTerm).Commit(log_->CommitIndex());
+
+      if (!m.v.entries().empty()) {
+        switch (pr.State()) {
+          case Progress::StateProbe: {
+            pr.Pause();
+            break;
+          }
+          case Progress::StateReplicate: {
+            // optimistically increase the next when in ProgressStateReplicate
+            uint64_t last = m.v.entries().rbegin()->index();
+            pr.OptimisticUpdate(last);
+            break;
+          }
+          default: {
+            D_FMT_SLOG(FATAL, "%x is sending append in unhandled state %s", id_, pr.State());
+            break;
+          }
+        }
+      }
     } else {
       // send snapshot if we failed to get term or entries
+
+      if (!pr.RecentActive()) {
+        D_FMT_SLOG(INFO, "ignore sending snapshot to %x since it is not recently active", to);
+        return;
+      }
+
       pb::Snapshot snap = log_->Snapshot().GetValue();
       if (IsEmptySnapshot(snap)) {
         FMT_SLOG(FATAL,
@@ -563,6 +590,8 @@ class Raft {
 
   void handleMsgHeartbeatResp(const pb::Message& m) {
     auto& pr = prs_[m.from()];
+    pr.Resume();
+
     if (pr.MatchIndex() < log_->LastIndex()) {
       sendAppend(m.from());
     }
@@ -570,26 +599,36 @@ class Raft {
 
   void handleMsgAppResp(const pb::Message& m) {
     auto& pr = prs_[m.from()];
+    pr.RecentActive(true);
+
     if (m.reject()) {
       DLOG(INFO) << fmt::format(
           "{:x} received msgApp rejection(lastindex: {:d}) from {:x} for index {:d}", id_,
           m.rejecthint(), m.from(), m.index());
 
       if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
-        // retry with a smaller index
+        // resume the progress, retry with a lower index.
         DLOG(INFO) << fmt::format("{:x} decreased progress of {:x} to [{:s}]", id_, m.from(),
                                   pr.ToString());
+        pr.Resume();
+        if (pr.State() == Progress::StateReplicate) {
+          pr.State(Progress::StateProbe);
+        }
         sendAppend(m.from());
       }
     } else {
       if (pr.MaybeUpdate(m.index())) {
-        advanceCommitIndex();
-      }
+        if (maybeCommit()) {
+          bcastAppend();
+        }
 
-      if (pr.State() == Progress::StateSnapshot && pr.NeedSnapshotAbort()) {
-        D_FMT_SLOG(INFO, "%x snapshot aborted, resumed sending replication messages to %x [%s]",
-                   id_, m.from(), pr.ToString());
-        pr.BecomeProbe();
+        if (pr.State() == Progress::StateSnapshot && pr.NeedSnapshotAbort()) {
+          D_FMT_SLOG(INFO, "%x snapshot aborted, resumed sending replication messages to %x [%s]",
+                     id_, m.from(), pr.ToString());
+          pr.BecomeProbe();
+        } else if (pr.State() == Progress::StateProbe) {
+          pr.BecomeReplicate();
+        }
       }
     }
   }
@@ -675,6 +714,15 @@ class Raft {
     }
   }
 
+  // maybeCommit attempts to advance the commit index. Returns true if
+  // the commit index changed (in which case the caller should call
+  // r.bcastAppend).
+  bool maybeCommit() {
+    uint64_t oldCommit = log_->CommitIndex();
+    advanceCommitIndex();
+    return log_->CommitIndex() > oldCommit;
+  }
+
   void campaign(CampaignType type) {
     DLOG_ASSERT(type == kCampaignElection || type == kCampaignPreElection);
 
@@ -736,8 +784,22 @@ class Raft {
       return false;
     }
 
+    FMT_SLOG(INFO,
+             "%x [commit: %d, lastindex: %d, lastterm: %d] starts to restore snapshot [index: %d, "
+             "term: %d]",
+             id_, log_->CommitIndex(), log_->LastIndex(), log_->LastTerm(), snap.metadata().index(),
+             snap.metadata().term());
+
+    auto& tmpPbNodes = snap.metadata().conf_state().nodes();
+    std::vector<uint64_t> nodes(tmpPbNodes.begin(), tmpPbNodes.end());
+
+    // apply snapshot only when there's no existing log entry with the same index and term as
+    // Snapshot.LastIndex and Snapshot.LastTerm.
+    // the snapshot will clear the entries in raftLog
+    log_->Restore(snap);
+
     prs_.clear();
-    for (uint64_t n : snap.metadata().conf_state().nodes()) {
+    for (uint64_t n : nodes) {
       uint64_t match = 0, next = log_->LastIndex() + 1;
       if (n == id_) {
         match = next - 1;
@@ -746,15 +808,6 @@ class Raft {
       FMT_SLOG(INFO, "%x restored progress of %x [%s]", id_, n, prs_[n].ToString());
     }
 
-    // apply snapshot only when there's no existing log entry with the same index and term as
-    // Snapshot.LastIndex and Snapshot.LastTerm.
-    // the snapshot will clear the entries in raftLog
-    FMT_SLOG(INFO,
-             "%x [commit: %d, lastindex: %d, lastterm: %d] starts to restore snapshot [index: %d, "
-             "term: %d]",
-             id_, log_->CommitIndex(), log_->LastIndex(), log_->LastTerm(), snap.metadata().index(),
-             snap.metadata().term());
-    log_->Restore(snap);
     return true;
   }
 

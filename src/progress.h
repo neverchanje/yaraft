@@ -19,8 +19,6 @@
 #include <cstdint>
 #include <sstream>
 
-#include "inflights.h"
-
 #include <fmt/format.h>
 #include <glog/logging.h>
 
@@ -64,6 +62,10 @@ class Progress {
     return recentActive_;
   }
 
+  Progress& RecentActive(bool val) {
+    recentActive_ = val;
+  }
+
   // PendingSnapshot is used in ProgressStateSnapshot.
   // If there is a pending snapshot, the pendingSnapshot will be set to the
   // index of the snapshot. If pendingSnapshot is set, the replication process of
@@ -88,6 +90,8 @@ class Progress {
         return paused_;
       case StateSnapshot:
         return true;
+      case StateReplicate:
+        return false;
       default:
         LOG(FATAL) << "unexpected state";
         break;
@@ -191,6 +195,10 @@ class Progress {
     pendingSnapshot_ = 0;
   }
 
+  void OptimisticUpdate(uint64_t n) {
+    next_ = n + 1;
+  }
+
  private:
   uint64_t next_;
   uint64_t match_;
@@ -216,12 +224,7 @@ class Progress {
   // When a leader receives a reply, the previous inflights should
   // be freed by calling inflights.freeTo with the index of the last
   // received entry.
-  Inflights ins_;
+  std::vector<uint64_t> ins_;
 };
-
-inline std::ostream& operator<<(std::ostream& os, const Progress& p) {
-  os << p.ToString();
-  return os;
-}
 
 }  // namespace yaraft
