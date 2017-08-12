@@ -50,7 +50,11 @@ class Raft {
   enum StateRole { kFollower, kCandidate, kPreCandidate, kLeader, kStateNum };
 
   explicit Raft(Config* conf)
-      : c_(conf), log_(new RaftLog(conf->storage)), electionElapsed_(0), votedFor_(0) {
+      : c_(conf),
+        log_(new RaftLog(conf->storage)),
+        electionElapsed_(0),
+        votedFor_(0),
+        pendingConf_(false) {
     FATAL_NOT_OK(conf->Validate(), "Config::Validate");
 
     id_ = conf->id;
@@ -144,6 +148,10 @@ class Raft {
     return id_;
   }
 
+  bool IsLeader() const {
+    return role_ == kLeader;
+  }
+
   void Tick() {
     switch (role_) {
       case kLeader:
@@ -161,6 +169,35 @@ class Raft {
 
   bool HasPeer(uint64_t id) const {
     return (prs_.find(id) != prs_.end());
+  }
+
+  std::set<uint64_t> Peers() const {
+    std::set<uint64_t> peers;
+    for (auto& e : prs_) {
+      peers.insert(e.first);
+    }
+    return peers;
+  }
+
+  // call this function when a new ConfChangeAddNode has applied.
+  void AddNode(uint64_t nodeId) {
+    pendingConf_ = false;
+
+    // Ignore any redundant addNode calls (which can happen because the
+    // initial bootstrapping entries are applied twice).
+    if (prs_.find(nodeId) != prs_.end()) {
+      return;
+    }
+
+    prs_[nodeId] = Progress().MatchIndex(0).NextIndex(log_->LastIndex() + 1);
+  }
+
+  void RemoveNode(uint64_t nodeId) {
+    pendingConf_ = false;
+
+    if (prs_.find(nodeId) != prs_.end()) {
+      prs_.erase(nodeId);
+    }
   }
 
  private:
@@ -204,6 +241,21 @@ class Raft {
     resetRandomizedElectionTimeout();
   }
 
+  // number of uncommitted conf change entries
+  size_t numOfPendingConf() {
+    auto s = log_->Entries(log_->CommitIndex() + 1, UINT64_MAX);
+    FATAL_NOT_OK(s, "Log::Entries");
+    EntryVec& ents = s.GetValue();
+
+    size_t n = 0;
+    for (auto& e : ents) {
+      if (e.type() == pb::EntryConfChange) {
+        n++;
+      }
+    }
+    return n;
+  }
+
   void becomeLeader() {
     if (role_ == kFollower) {
 #ifdef BUILD_TESTS
@@ -216,8 +268,20 @@ class Raft {
     role_ = kLeader;
     currentLeader_ = id_;
     heartbeatElapsed_ = 0;
-    prs_.clear();
 
+    size_t nconf = numOfPendingConf();
+    if (nconf > 1) {
+#ifdef BUILD_TESTS
+      throw RaftError("unexpected multiple uncommitted config entry");
+#else
+      FMT_LOG(FATAL, "unexpected multiple uncommitted config entry");
+#endif
+    }
+    if (nconf == 1) {
+      pendingConf_ = true;
+    }
+
+    prs_.clear();
     for (uint64_t id : c_->peers) {
       prs_[id] = Progress().NextIndex(log_->LastIndex() + 1).MatchIndex(0);
     }
@@ -232,7 +296,7 @@ class Raft {
         bcastHeartbeat();
         return;
       case pb::MsgProp:
-        handleMsgPropLeader(m);
+        handleMsgProp(m);
         return;
       default:
         break;
@@ -368,9 +432,6 @@ class Raft {
         becomeFollower(m.term(), m.from());
         handleHeartbeat(m);
         break;
-      case pb::MsgProp:
-        handleMsgPropCandidate(m);
-        break;
       case pb::MsgSnap:
         becomeFollower(m.term(), m.from());
         handleSnapshot(m);
@@ -388,9 +449,6 @@ class Raft {
         break;
       case pb::MsgHeartbeat:
         handleHeartbeat(m);
-        break;
-      case pb::MsgProp:
-        handleMsgPropFollower(m);
         break;
       case pb::MsgSnap:
         handleSnapshot(m);
@@ -662,26 +720,25 @@ class Raft {
     }
   }
 
-  void handleMsgPropLeader(pb::Message& m) {
+  // REQUIRED: current role is leader.
+  void handleMsgProp(pb::Message& m) {
     if (UNLIKELY(m.entries().empty())) {
       FMT_SLOG(FATAL, "%x stepped empty MsgProp", id_);
     }
+
+    if (UNLIKELY(m.entries().size() > 1)) {
+      FMT_SLOG(FATAL, "%x: proposing multiple entries is not allowed", id_);
+    }
+
+    if (m.entries().begin()->type() == pb::EntryConfChange) {
+      if (!pendingConf_) {
+        pendingConf_ = true;
+      } else {
+      }
+    }
+
     appendRawEntries(m);
     bcastAppend();
-  }
-
-  void handleMsgPropFollower(pb::Message& m) {
-    if (currentLeader_ == 0) {
-      LOG(INFO) << fmt::format("{:x} no leader at term {:d}; dropping proposal", id_, currentTerm_);
-      return;
-    }
-    m.set_to(currentLeader_);
-    m.set_term(0);
-    send(m);
-  };
-
-  void handleMsgPropCandidate(const pb::Message& m) {
-    LOG(INFO) << fmt::format("{:x} no leader at term {:d}; dropping proposal", id_, currentTerm_);
   }
 
   void appendRawEntries(pb::Message& m) {
@@ -889,6 +946,8 @@ class Raft {
 
   uint64_t currentTerm_;
   uint64_t votedFor_;
+
+  bool pendingConf_;
 
   std::unordered_map<uint64_t, bool> voteGranted_;
 

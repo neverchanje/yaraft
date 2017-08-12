@@ -464,37 +464,10 @@ class RaftTest {
       n->StartElection(2);
       ASSERT_EQ(n->Peer(2)->role_, Raft::kLeader);
 
-      n->Propose(1);
+      n->Propose(2);
 
       for (uint64_t i = 1; i <= 3; i++) {
         ASSERT_EQ(n->Peer(i)->log_->CommitIndex(), 4);
-      }
-    }
-  }
-
-  static void TestProposalByProxy() {
-    struct TestData {
-      Network *network;
-    } tests[] = {
-        {Network::New(3)},
-        //{Network::New(3)->Down(3)}
-    };
-    for (auto t : tests) {
-      std::unique_ptr<Network> n(t.network);
-
-      // 1 starts election and becomes leader, lastIndex = 1
-      n->StartElection(1);
-
-      // 2 will transfer the proposal to leader 1
-      n->Propose(2, "somedata");
-
-      for (auto r : n->Peers()) {
-        ASSERT_EQ(r->log_->CommitIndex(), 2);
-
-        auto ev = r->log_->AllEntries();
-        ASSERT_EQ(ev.size(), 2);
-        Entry_ASSERT_EQ(ev[0], PBEntry().Term(1).Index(1).Data("").v);
-        Entry_ASSERT_EQ(ev[1], PBEntry().Term(1).Index(2).Data("somedata").v);
       }
     }
   }
@@ -608,6 +581,80 @@ class RaftTest {
 
     ASSERT_EQ(r->mails_.size(), 1);
   }
+
+  // TestStepConfig tests that when raft step msgProp in EntryConfChange type,
+  // it appends the entry to log and sets pendingConf to be true.
+  static void TestStepConfig() {
+    // a raft that cannot make progress
+    RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, new MemoryStorage));
+    r->becomeCandidate();
+    r->becomeLeader();
+    uint64_t index = r->log_->LastIndex();
+    r->Step(PBMessage()
+                .From(1)
+                .To(1)
+                .Type(pb::MsgProp)
+                .Entries({PBEntry().Type(pb::EntryConfChange).v})
+                .v);
+
+    ASSERT_EQ(r->log_->LastIndex(), index + 1);
+    ASSERT_TRUE(r->pendingConf_);
+  }
+
+  // TestRecoverPendingConfig tests that new leader recovers its pendingConf flag
+  // based on uncommitted entries.
+  static void TestRecoverPendingConfig() {
+    struct TestData {
+      pb::EntryType type;
+      bool wpending;
+    } tests[] = {
+        {pb::EntryNormal, false}, {pb::EntryConfChange, true},
+    };
+    for (auto t : tests) {
+      RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, new MemoryStorage));
+      r->log_->Append(PBEntry().Index(2).Type(t.type).v);
+      r->becomeCandidate();
+      r->becomeLeader();
+      ASSERT_EQ(r->pendingConf_, t.wpending);
+    }
+  }
+
+  // TestRecoverDoublePendingConfig tests that new leader will panic if
+  // there exist two uncommitted config entries.
+  static void TestRecoverDoublePendingConfig() {
+    bool err = false;
+    try {
+      RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, new MemoryStorage));
+      r->log_->Append(PBEntry().Index(2).Type(pb::EntryConfChange).v);
+      r->log_->Append(PBEntry().Index(3).Type(pb::EntryConfChange).v);
+      r->becomeCandidate();
+      r->becomeLeader();
+    } catch (RaftError &e) {
+      err = true;
+    }
+    ASSERT_TRUE(err);
+  }
+
+  // TestAddNode tests that addNode could update pendingConf and nodes correctly.
+  static void TestAddNode() {
+    RaftUPtr r(newTestRaft(1, {1}, 10, 1, new MemoryStorage));
+    r->pendingConf_ = true;
+    r->AddNode(2);
+
+    ASSERT_FALSE(r->pendingConf_);
+    ASSERT_EQ(r->Peers(), std::set<uint64_t>({1, 2}));
+  }
+
+  // TestRemoveNode tests that removeNode could update pendingConf, nodes and
+  // and removed list correctly.
+  static void TestRemoveNode() {
+    RaftUPtr r(newTestRaft(1, {1, 2}, 10, 1, new MemoryStorage));
+    r->pendingConf_ = true;
+    r->RemoveNode(2);
+
+    ASSERT_FALSE(r->pendingConf_);
+    ASSERT_EQ(r->Peers(), std::set<uint64_t>({1}));
+  }
 };
 
 }  // namespace yaraft
@@ -690,10 +737,6 @@ TEST(Raft, SingleNodeCommit) {
   RaftTest::TestSingleNodeCommit();
 }
 
-TEST(Raft, ProposalByProxy) {
-  RaftTest::TestProposalByProxy();
-}
-
 TEST(Raft, Restore) {
   RaftTest::TestRestore();
 }
@@ -712,4 +755,24 @@ TEST(Raft, ProgressResumeByHeartbeatResp) {
 
 TEST(Raft, ProgressPaused) {
   RaftTest::TestProgressPaused();
+}
+
+TEST(Raft, StepConfig) {
+  RaftTest::TestStepConfig();
+}
+
+TEST(Raft, RecoverPendingConfig) {
+  RaftTest::TestRecoverPendingConfig();
+}
+
+TEST(Raft, RecoverDoublePendingConfig) {
+  RaftTest::TestRecoverDoublePendingConfig();
+}
+
+TEST(Raft, AddNode) {
+  RaftTest::TestAddNode();
+}
+
+TEST(Raft, RemoveNode) {
+  RaftTest::TestRemoveNode();
 }
