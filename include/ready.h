@@ -15,8 +15,8 @@
 
 #pragma once
 
-#include "storage.h"
 #include "memory_storage.h"
+#include "storage.h"
 
 #include <yaraft/pb/raftpb.pb.h>
 
@@ -45,19 +45,23 @@ struct Ready {
   std::vector<pb::Message> messages;
 
  public:
-
   bool IsEmpty() const {
     return (!hardState) && entries.empty() && (!snapshot) && messages.empty();
   }
 
   void Advance(MemoryStorage* store) {
-    if(!entries.empty()) {
+    if (!entries.empty()) {
       // stable the unstable entries to memory storage.
       store->Append(std::move(entries));
     }
 
-    if(hardState) {
+    if (hardState) {
       hardState.reset(nullptr);
+    }
+
+    if (snapshot) {
+      LOG_ASSERT(IsEmptySnapshot(*snapshot));
+      snapshot.reset(nullptr);
     }
   }
 };

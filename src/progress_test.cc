@@ -176,16 +176,3 @@ TEST(Progress, Update) {
     ASSERT_EQ(p.NextIndex(), tt.wn);
   }
 }
-
-// TestProgress` ensures that progress.maybeUpdate and progress.maybeDecrTo
-// will reset progress.paused.
-TEST(Progess, Resume) {
-  auto p = Progress().NextIndex(2);
-  p.Pause();
-  p.MaybeDecrTo(1, 1);
-  ASSERT_FALSE(p.IsPaused());
-
-  p.Pause();
-  p.MaybeUpdate(2);
-  ASSERT_FALSE(p.IsPaused());
-}
