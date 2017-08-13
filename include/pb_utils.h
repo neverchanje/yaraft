@@ -24,7 +24,7 @@ typedef std::vector<pb::Entry> EntryVec;
 
 inline bool IsLocalMsg(const pb::Message& m) {
   if (!m.has_from()) {
-    return true;
+    return false;
   }
   return m.from() == m.to();
 }

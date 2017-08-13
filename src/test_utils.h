@@ -206,4 +206,14 @@ static uint64_t noLimit = std::numeric_limits<uint64_t>::max();
     }                                            \
   } while (0)
 
+#define ASSERT_OK(status)                        \
+  do {                                           \
+    const auto& _s = status;                     \
+    if (_s.IsOK()) {                             \
+      SUCCEED();                                 \
+    } else {                                     \
+      FAIL() << "Bad status: " << _s.ToString(); \
+    }                                            \
+  } while (0)
+
 }  // namespace yaraft

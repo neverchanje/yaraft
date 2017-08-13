@@ -53,3 +53,91 @@ TEST(RawNode, Propose) {
   ASSERT_EQ(rn.GetInfo().commitIndex, 5);
   ASSERT_EQ(rn.GetInfo().logIndex, 5);
 }
+
+TEST(RawNode, ProposeConfChange) {
+  auto memstore = new MemoryStorage;
+  RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
+  ASSERT_OK(rn.Campaign());
+  for (int i = 0; i < 4; i++) {
+    ASSERT_OK(rn.Propose("a"));
+  }
+
+  for (uint64_t i = 2; i <= 5; i++) {
+    auto cc = PBConfChange().Type(pb::ConfChangeAddNode).NodeId(i).v;
+    ASSERT_OK(rn.ProposeConfChange(cc));
+
+    Ready* rd = rn.GetReady();
+    rd->Advance(memstore);
+    rn.ApplyConfChange(cc);
+  }
+
+  {
+    std::set<uint64_t> actual;
+    auto pr = rn.GetInfo().progress;
+    for (auto& e : pr) {
+      actual.insert(e.first);
+    }
+    ASSERT_EQ(actual, std::set<uint64_t>({1, 2, 3, 4, 5}));
+  }
+
+  {
+    EntryVec actual(memstore->TEST_Entries().begin() + 1, memstore->TEST_Entries().end());
+    ASSERT_EQ(actual.size(), 9);
+
+    for (int i = 0; i < 5; i++) {
+      ASSERT_EQ(actual[i].type(), pb::EntryNormal);
+    }
+
+    for (int i = 5; i < 9; i++) {
+      ASSERT_EQ(actual[i].type(), pb::EntryConfChange);
+    }
+  }
+}
+
+// TestRawNodeProposeAddDuplicateNode ensures that two proposes to add the same node should
+// not affect the later propose to add new node.
+TEST(RawNode, ProposeAddDuplicateNode) {
+  auto memstore = new MemoryStorage;
+  RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
+  ASSERT_OK(rn.Campaign());
+
+  auto proposeConfChangeAndApply = [&](uint64_t nodeId) {
+    ASSERT_OK(rn.ProposeConfChange(PBConfChange().Type(pb::ConfChangeAddNode).NodeId(nodeId).v));
+
+    Ready* rd = rn.GetReady();
+    for (const auto& e : rd->entries) {
+      if (e.type() == pb::EntryConfChange) {
+        pb::ConfChange cc;
+        cc.ParseFromString(e.data());
+        rn.ApplyConfChange(cc);
+      }
+    }
+
+    rd->Advance(memstore);
+    delete rd;
+  };
+
+  proposeConfChangeAndApply(2);
+  proposeConfChangeAndApply(2);
+  proposeConfChangeAndApply(3);
+
+  {
+    std::set<uint64_t> actual;
+    auto pr = rn.GetInfo().progress;
+    for (auto& e : pr) {
+      actual.insert(e.first);
+    }
+    ASSERT_EQ(actual, std::set<uint64_t>({1, 2, 3}));
+  }
+
+  {
+    EntryVec actual(memstore->TEST_Entries().begin() + 1, memstore->TEST_Entries().end());
+
+    ASSERT_EQ(actual.size(), 4);
+
+    ASSERT_EQ(actual[0].type(), pb::EntryNormal);
+    ASSERT_EQ(actual[1].type(), pb::EntryConfChange);
+    ASSERT_EQ(actual[2].type(), pb::EntryConfChange);
+    ASSERT_EQ(actual[3].type(), pb::EntryConfChange);
+  }
+}

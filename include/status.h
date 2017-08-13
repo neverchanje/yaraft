@@ -31,6 +31,7 @@ class Error {
     StepLocalMsg,
     StepPeerNotFound,
     SnapshotUnavailable,
+    ProposeToNonLeader,
   };
 
   static constexpr uint64_t ErrorCodesNum = LogCompacted + 1;
@@ -100,8 +101,8 @@ class StatusWith {
 
 #define ASSIGN_IF_OK(sw, var)                                                                   \
   do {                                                                                          \
-    const auto &_sw = (sw);                                                                     \
-    auto &_var = (var);                                                                         \
+    const auto& _sw = (sw);                                                                     \
+    auto& _var = (var);                                                                         \
     RETURN_NOT_OK(_sw.GetStatus());                                                             \
     static_assert(std::is_convertible<decltype(_var), decltype(_sw.GetValue())>::value == true, \
                   #var " cannot be converted to " #sw ".GetValue()");                           \

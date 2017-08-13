@@ -157,4 +157,18 @@ struct PBHardState {
   }
 };
 
+struct PBConfChange {
+  pb::ConfChange v;
+
+  PBConfChange& Type(pb::ConfChangeType type) {
+    v.set_type(type);
+    return *this;
+  }
+
+  PBConfChange& NodeId(uint64_t id) {
+    v.set_nodeid(id);
+    return *this;
+  }
+};
+
 }  // namespace yaraft

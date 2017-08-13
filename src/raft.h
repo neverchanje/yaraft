@@ -730,10 +730,14 @@ class Raft {
       FMT_SLOG(FATAL, "%x: proposing multiple entries is not allowed", id_);
     }
 
-    if (m.entries().begin()->type() == pb::EntryConfChange) {
+    pb::Entry& e = *m.mutable_entries(0);
+    if (e.type() == pb::EntryConfChange) {
       if (!pendingConf_) {
         pendingConf_ = true;
       } else {
+        FMT_SLOG(INFO, "propose conf %s ignored since pending unapplied configuration",
+                 e.DebugString());
+        e = PBEntry().Type(pb::EntryNormal).v;
       }
     }
 
