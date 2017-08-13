@@ -44,8 +44,7 @@ bool operator!=(const pb::HardState& a, const pb::HardState& b) {
 
 RawNode::RawNode(Config* conf) : raft_(new Raft(conf)), prevHardState_(new pb::HardState) {}
 
-RawNode::~RawNode() {
-}
+RawNode::~RawNode() = default;
 
 void RawNode::Tick() {
   raft_->Tick();
@@ -66,6 +65,10 @@ Status RawNode::Step(pb::Message& m) {
 }
 
 Status RawNode::Propose(const silly::Slice& data) {
+  if (!raft_->IsLeader()) {
+    return Status::Make(Error::ProposeToNonLeader, fmt::format("{} is not leader", raft_->Id()));
+  }
+
   uint64_t id = raft_->Id(), term = raft_->Term();
   auto e = PBEntry().Data(data).v;
   return raft_->Step(PBMessage().From(id).To(id).Type(pb::MsgProp).Term(term).Entries({e}).v);
@@ -105,7 +108,52 @@ RaftInfo RawNode::GetInfo() const {
   info.currentLeader = raft_->currentLeader_;
   info.currentTerm = raft_->currentTerm_;
   info.commitIndex = raft_->log_->CommitIndex();
+  info.progress = raft_->prs_;
   return info;
+}
+
+void RawNode::ReportSnapshot(uint64_t id, RawNode::SnapshotStatus status) {
+  bool reject = status == kSnapshotFailure;
+  raft_->Step(PBMessage().Type(pb::MsgSnapStatus).From(id).To(id).Reject(reject).v);
+}
+
+void RawNode::ReportUnreachable(uint64_t id) {
+  raft_->Step(PBMessage().Type(pb::MsgUnreachable).From(id).To(id).v);
+}
+
+pb::ConfState RawNode::ApplyConfChange(const pb::ConfChange& cc) {
+  pb::ConfState confState;
+  if (!cc.has_nodeid() || cc.nodeid() == 0) {
+    FMT_LOG(FATAL, "what???");
+  }
+
+  switch (cc.type()) {
+    case pb::ConfChangeAddNode:
+      raft_->AddNode(cc.nodeid());
+      break;
+    case pb::ConfChangeRemoveNode:
+      raft_->RemoveNode(cc.nodeid());
+      break;
+    default:
+      FMT_LOG(FATAL, "unexpected conf type");
+  }
+
+  confState.add_nodes(cc.nodeid());
+  return confState;
+}
+
+Status RawNode::ProposeConfChange(const pb::ConfChange& cc) {
+  if (!raft_->IsLeader()) {
+    return Status::Make(Error::ProposeToNonLeader, fmt::format("{} is not leader", raft_->Id()));
+  }
+
+  return raft_->Step(
+      PBMessage()
+          .From(1)
+          .To(1)
+          .Type(pb::MsgProp)
+          .Entries({PBEntry().Type(pb::EntryConfChange).Data(cc.SerializeAsString()).v})
+          .v);
 }
 
 }  // namespace yaraft

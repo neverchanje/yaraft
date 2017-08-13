@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "raft_info.h"
 #include "status.h"
 
 #include <yaraft/pb/raftpb.pb.h>
@@ -23,13 +24,6 @@ namespace yaraft {
 class Raft;
 class Config;
 class Ready;
-
-struct RaftInfo {
-  uint64_t currentLeader;
-  uint64_t currentTerm;
-  uint64_t logIndex;
-  uint64_t commitIndex;
-};
 
 class RawNode {
  public:
@@ -47,17 +41,25 @@ class RawNode {
   Status Campaign();
 
   // Propose proposes data be appended to the raft log.
-  Status Propose(const silly::Slice& data);
+  Status Propose(const silly::Slice &data);
 
   // GetReady returns the current point-in-time state of this RawNode,
   // and returns null when there's no state ready (to be persisted or transferred).
   Ready *GetReady();
 
-  // Advance notifies the RawNode that the application has applied and saved progress in the
-  // last Ready results.
-  void Advance(const Ready &ready);
+  enum SnapshotStatus { kSnapshotFinish = 1, kSnapshotFailure = 2 };
 
-  const Config *GetConfig() const;
+  // ReportSnapshot reports the status of the sent snapshot.
+  void ReportSnapshot(uint64_t id, SnapshotStatus status);
+
+  // ReportUnreachable reports the given node is not reachable for the last send.
+  void ReportUnreachable(uint64_t id);
+
+  // ProposeConfChange proposes a config change.
+  Status ProposeConfChange(const pb::ConfChange &cc);
+
+  // ApplyConfChange applies a config change to the local node.
+  pb::ConfState ApplyConfChange(const pb::ConfChange &cc);
 
   RaftInfo GetInfo() const;
 
