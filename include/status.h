@@ -14,8 +14,9 @@
 
 #pragma once
 
+#include <cassert>
+
 #include <boost/optional.hpp>
-#include <glog/logging.h>
 #include <silly/status.h>
 
 namespace yaraft {
@@ -63,12 +64,12 @@ class StatusWith {
   StatusWith(Error::ErrorCodes code) : StatusWith(Status::Make(code, nullptr)) {}
 
   const T& GetValue() const {
-    LOG_ASSERT(status_.IsOK());
+    assert(status_.IsOK());
     return *value_;
   }
 
   T& GetValue() {
-    LOG_ASSERT(status_.IsOK());
+    assert(status_.IsOK());
     return *value_;
   }
 
@@ -88,25 +89,5 @@ class StatusWith {
   Status status_;
   boost::optional<T> value_;
 };
-
-/// @brief Return the given status if it is not @c OK.
-#define RETURN_NOT_OK SILLY_RETURN_NOT_OK
-
-#define RETURN_NOT_OK_APPEND(s, msg) \
-  do {                               \
-    auto _s = (s);                   \
-    if (UNLIKELY(!_s.IsOK()))        \
-      return _s << msg;              \
-  } while (0);
-
-#define ASSIGN_IF_OK(sw, var)                                                                   \
-  do {                                                                                          \
-    const auto& _sw = (sw);                                                                     \
-    auto& _var = (var);                                                                         \
-    RETURN_NOT_OK(_sw.GetStatus());                                                             \
-    static_assert(std::is_convertible<decltype(_var), decltype(_sw.GetValue())>::value == true, \
-                  #var " cannot be converted to " #sw ".GetValue()");                           \
-    _var = _sw.GetValue();                                                                      \
-  } while (0)
 
 }  // namespace yaraft
