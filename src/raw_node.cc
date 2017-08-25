@@ -108,7 +108,9 @@ RaftInfo RawNode::GetInfo() const {
   info.currentLeader = raft_->currentLeader_;
   info.currentTerm = raft_->currentTerm_;
   info.commitIndex = raft_->log_->CommitIndex();
-  info.progress = raft_->prs_;
+  for (auto e : raft_->prs_) {
+    info.progress[e.first] = RaftProgress(e.second.NextIndex(), e.second.MatchIndex());
+  }
   return info;
 }
 

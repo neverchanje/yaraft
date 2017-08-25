@@ -60,7 +60,7 @@ struct Ready {
     }
 
     if (snapshot) {
-      LOG_ASSERT(IsEmptySnapshot(*snapshot));
+      assert(IsEmptySnapshot(*snapshot));
       snapshot.reset(nullptr);
     }
   }

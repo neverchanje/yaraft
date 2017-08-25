@@ -17,16 +17,22 @@
 #include <cstdint>
 #include <unordered_map>
 
-#include "progress.h"
-
 namespace yaraft {
+
+struct RaftProgress {
+  RaftProgress(uint64_t next, uint64_t match) : nextIndex(next), matchIndex(match) {}
+  RaftProgress(): nextIndex(0), matchIndex(0) {}
+
+  uint64_t nextIndex;
+  uint64_t matchIndex;
+};
 
 struct RaftInfo {
   uint64_t currentLeader;
   uint64_t currentTerm;
   uint64_t logIndex;
   uint64_t commitIndex;
-  std::unordered_map<uint64_t, Progress> progress;
+  std::unordered_map<uint64_t, RaftProgress> progress;
 };
 
 }  // namespace yaraft

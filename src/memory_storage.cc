@@ -15,8 +15,7 @@
 
 #include "memory_storage.h"
 #include "exception.h"
-
-#include <glog/logging.h>
+#include "logging.h"
 
 namespace yaraft {
 
