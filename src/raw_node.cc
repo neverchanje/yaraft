@@ -52,7 +52,7 @@ void RawNode::Tick() {
 
 Status RawNode::Step(pb::Message& m) {
   // ignore unexpected local messages receiving over network
-  if (IsLocalMsg(m)) {
+  if (IsLocalMessage(m.type())) {
     return Status::Make(Error::StepLocalMsg, "cannot step raft local message");
   }
 

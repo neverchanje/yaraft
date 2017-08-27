@@ -22,11 +22,17 @@ namespace yaraft {
 
 typedef std::vector<pb::Entry> EntryVec;
 
-inline bool IsLocalMsg(const pb::Message& m) {
-  if (!m.has_from()) {
-    return false;
+inline bool IsLocalMessage(pb::MessageType msgt) {
+  switch (msgt) {
+    case pb::MsgHup:
+    case pb::MsgBeat:
+    case pb::MsgUnreachable:
+    case pb::MsgSnapStatus:
+    case pb::MsgCheckQuorum:
+      return true;
+    default:
+      return false;
   }
-  return m.from() == m.to();
 }
 
 inline bool IsResponseMsg(const pb::Message& m) {

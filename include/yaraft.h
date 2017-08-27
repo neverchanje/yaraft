@@ -20,4 +20,3 @@
 #include <yaraft/ready.h>
 #include <yaraft/status.h>
 #include <yaraft/storage.h>
-#include <yaraft/util.h>

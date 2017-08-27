@@ -23,7 +23,12 @@ TEST(RawNode, Step) {
   for (int i = pb::MessageType_MIN; i <= pb::MessageType_MAX; i++) {
     RawNode rn(newTestConfig(1, {1}, 10, 1, new MemoryStorage()));
     auto s = rn.Step(PBMessage().From(1).To(1).Type(static_cast<pb::MessageType>(i)).v);
-    ASSERT_EQ(s.Code(), Error::StepLocalMsg);
+
+    if(IsLocalMessage(pb::MessageType(i))) {
+      ASSERT_EQ(s.Code(), Error::StepLocalMsg);
+    } else {
+      ASSERT_EQ(s.Code(), Error::OK);
+    }
   }
 }
 

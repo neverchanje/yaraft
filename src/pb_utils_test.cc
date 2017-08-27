@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util.h"
+#include "pb_utils.h"
 
 #include <gtest/gtest.h>
 
