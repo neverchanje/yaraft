@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include <fmt/format.h>
 #include <glog/logging.h>
 
@@ -30,24 +32,4 @@
     if (UNLIKELY(!_s.IsOK())) {                              \
       LOG(FATAL) << (fatal_prefix) << ": " << _s.ToString(); \
     }                                                        \
-  } while (0);
-
-/// @brief Return the given status if it is not @c OK.
-#define RETURN_NOT_OK SILLY_RETURN_NOT_OK
-
-#define RETURN_NOT_OK_APPEND(s, msg) \
-  do {                               \
-    auto _s = (s);                   \
-    if (UNLIKELY(!_s.IsOK()))        \
-      return _s << msg;              \
-  } while (0);
-
-#define ASSIGN_IF_OK(sw, var)                                                                   \
-  do {                                                                                          \
-    const auto& _sw = (sw);                                                                     \
-    auto& _var = (var);                                                                         \
-    RETURN_NOT_OK(_sw.GetStatus());                                                             \
-    static_assert(std::is_convertible<decltype(_var), decltype(_sw.GetValue())>::value == true, \
-                  #var " cannot be converted to " #sw ".GetValue()");                           \
-    _var = _sw.GetValue();                                                                      \
   } while (0)

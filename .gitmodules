@@ -1,0 +1,3 @@
+[submodule "silly"]
+    path = silly
+    url = https://github.com/IppClub/silly.git
