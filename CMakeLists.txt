@@ -41,6 +41,7 @@ include_directories(src)
 include_directories(include)
 include_directories(build/third_parties/include)
 include_directories(third_parties/googletest-1.8.0/googletest/include)
+include_directories(silly)
 
 add_subdirectory(src)
 add_subdirectory(third_parties/googletest-1.8.0/googletest)

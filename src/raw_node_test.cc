@@ -24,7 +24,7 @@ TEST(RawNode, Step) {
     RawNode rn(newTestConfig(1, {1}, 10, 1, new MemoryStorage()));
     auto s = rn.Step(PBMessage().From(1).To(1).Type(static_cast<pb::MessageType>(i)).v);
 
-    if(IsLocalMessage(pb::MessageType(i))) {
+    if (IsLocalMessage(pb::MessageType(i))) {
       ASSERT_EQ(s.Code(), Error::StepLocalMsg);
     } else {
       ASSERT_EQ(s.Code(), Error::OK);

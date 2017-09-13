@@ -16,7 +16,6 @@
 
 #include <cassert>
 
-#include <boost/optional.hpp>
 #include <silly/status.h>
 
 namespace yaraft {
@@ -33,61 +32,20 @@ class Error {
     StepPeerNotFound,
     SnapshotUnavailable,
     ProposeToNonLeader,
-  };
 
-  static constexpr uint64_t ErrorCodesNum = LogCompacted + 1;
+    ErrorCodesNum
+  };
 
   static inline std::string ToString(unsigned int errorCode) {
     return toString(errorCode);
   }
 
- private:
-  friend class silly::Status<Error, Error::ErrorCodes>;
-
   static std::string toString(unsigned int errorCode);
 };
 
-typedef silly::Status<Error, Error::ErrorCodes> Status;
+typedef silly::Status<Error> Status;
 
 template <typename T>
-class StatusWith {
- public:
-  // for ok case
-  StatusWith(T value) : status_(Status::OK()), value_(value) {}
-
-  // for error case
-  StatusWith(Status status) : status_(std::move(status)) {}
-
-  StatusWith(Error::ErrorCodes code, const silly::Slice& reason)
-      : StatusWith(Status::Make(code, reason)) {}
-
-  StatusWith(Error::ErrorCodes code) : StatusWith(Status::Make(code, nullptr)) {}
-
-  const T& GetValue() const {
-    assert(status_.IsOK());
-    return *value_;
-  }
-
-  T& GetValue() {
-    assert(status_.IsOK());
-    return *value_;
-  }
-
-  const Status& GetStatus() const {
-    return status_;
-  }
-
-  bool IsOK() const {
-    return status_.IsOK();
-  }
-
-  std::string ToString() const {
-    return status_.ToString();
-  }
-
- private:
-  Status status_;
-  boost::optional<T> value_;
-};
+using StatusWith = silly::StatusWith<Status, T>;
 
 }  // namespace yaraft
