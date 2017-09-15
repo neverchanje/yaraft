@@ -26,6 +26,11 @@ install_if_necessary $PROTOBUF_NAME build_protobuf
 install_if_necessary $GLOG_NAME build_glog
 install_if_necessary $GFLAG_NAME build_gflag
 
+if [ ! -f $TP_STAMP_DIR/$SILLY_NAME ]; then
+    build_silly
+    make_stamp $SILLY_NAME
+fi
+
 if [ ! -d $GTEST_SOURCE ]; then
     fetch_and_expand ${GTEST_NAME}.zip
 fi

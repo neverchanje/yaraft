@@ -22,9 +22,9 @@ FMT_VERSION=3.0.1
 FMT_NAME=fmt-$FMT_VERSION
 FMT_SOURCE=$TP_DIR/$FMT_NAME
 
-SILLY_VERSION=0.0.1-alpha-1
+SILLY_VERSION=`git rev-parse HEAD | cut -c 1-7`
 SILLY_NAME=silly-$SILLY_VERSION
-SILLY_SOURCE=$TP_DIR/$SILLY_NAME
+SILLY_SOURCE=`pwd`/silly
 
 GFLAG_VERSION=2.2.0
 GFLAG_NAME=gflags-$GFLAG_VERSION
@@ -107,9 +107,9 @@ build_silly() {
   echo "Installing silly..."
   pushd ${SILLY_SOURCE}
 	mkdir -p build && cd build
-  cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DLITE_VERSION=true
+    cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR}
 	make && make install
-	popd
+  popd
 }
 
 build_protobuf() {

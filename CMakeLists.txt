@@ -31,9 +31,6 @@ include_directories(SYSTEM ${GLOG_INCLUDE_DIR})
 
 find_package(Gflags REQUIRED)
 
-find_library(SILLY_LIBRARY silly_lite PATH ${DEPS_LIB_DIR})
-message("-- Found ${SILLY_LIBRARY}")
-
 find_library(FMT_LIBRARY fmt PATH ${DEPS_LIB_DIR})
 message("-- Found ${FMT_LIBRARY}")
 
