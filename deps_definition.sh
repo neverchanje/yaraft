@@ -22,7 +22,7 @@ FMT_VERSION=3.0.1
 FMT_NAME=fmt-$FMT_VERSION
 FMT_SOURCE=$TP_DIR/$FMT_NAME
 
-SILLY_VERSION=`git rev-parse HEAD | cut -c 1-7`
+SILLY_VERSION=`git rev-parse @:silly | cut -c 1-7`
 SILLY_NAME=silly-$SILLY_VERSION
 SILLY_SOURCE=`pwd`/silly
 
