@@ -98,36 +98,36 @@ fetch_and_expand() {
 build_glog() {
   echo "Installing glog..."
   pushd ${GLOG_SOURCE}
-	./configure --prefix=${TP_BUILD_DIR} --disable-shared
-	make -j4 && make install
-	popd
+  ./configure --prefix=${TP_BUILD_DIR} --disable-shared
+  make -j4 && make install
+  popd
 }
 
 build_silly() {
   echo "Installing silly..."
   pushd ${SILLY_SOURCE}
-	mkdir -p build && cd build
-    cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR}
-	make && make install
+  mkdir -p build && cd build
+  cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR}
+  make && make install
   popd
 }
 
 build_protobuf() {
   echo "Installing protobuf..."
   pushd ${PROTOBUF_SOURCE}
-	autoreconf -ivf
-  ./configure --prefix=${TP_BUILD_DIR} --disable-shared
-	make -j4 && make install
-	popd
+  autoreconf -ivf
+  ./configure --prefix=${TP_BUILD_DIR}
+  make -j4 && make install
+  popd
 }
 
 build_fmtlib() {
   echo "Installing fmtlib..."
   pushd ${FMT_SOURCE}
-	mkdir -p build && cd build
+  mkdir -p build && cd build
   cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DFMT_TEST=false
-	make -j4 && make install
-	popd
+  make -j4 && make install
+  popd
 }
 
 build_gflag() {
@@ -142,6 +142,6 @@ build_gflag() {
     -DBUILD_STATIC_LIBS=On \
     -DREGISTER_INSTALL_PREFIX=Off \
     $GFLAG_SOURCE
-  make -j8 install
+    make -j8 install
   popd
 }

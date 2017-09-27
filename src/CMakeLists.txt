@@ -1,5 +1,4 @@
 set(YARAFT_TEST_LINK_LIBS
-        gtest gtest_main
         ${PROTOBUF_STATIC_LIBRARY}
         ${FMT_LIBRARY}
         ${GLOG_STATIC_LIB}
@@ -25,7 +24,7 @@ set(YARAFT_TEST_LINK_LIBS ${YARAFT_TEST_LINK_LIBS} yaraft)
 
 function(ADD_YARAFT_TEST TEST_NAME)
     add_executable(${TEST_NAME} ${TEST_NAME}.cc)
-    target_link_libraries(${TEST_NAME} ${YARAFT_TEST_LINK_LIBS})
+    target_link_libraries(${TEST_NAME} ${YARAFT_TEST_LINK_LIBS} gtest gtest_main)
 endfunction()
 
 if(${BUILD_TEST})
