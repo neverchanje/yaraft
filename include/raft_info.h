@@ -21,7 +21,7 @@ namespace yaraft {
 
 struct RaftProgress {
   RaftProgress(uint64_t next, uint64_t match) : nextIndex(next), matchIndex(match) {}
-  RaftProgress(): nextIndex(0), matchIndex(0) {}
+  RaftProgress() : nextIndex(0), matchIndex(0) {}
 
   uint64_t nextIndex;
   uint64_t matchIndex;

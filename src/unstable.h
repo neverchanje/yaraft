@@ -18,9 +18,9 @@
 #include <vector>
 
 #include "fluent_pb.h"
+#include "logging.h"
 
 #include <boost/optional.hpp>
-#include <glog/logging.h>
 
 namespace yaraft {
 

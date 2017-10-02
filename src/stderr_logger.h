@@ -14,27 +14,15 @@
 
 #pragma once
 
-#include <stdexcept>
+#include <memory>
 
-#include <fmt/format.h>
+#include "logging.h"
 
 namespace yaraft {
 
-class RaftError : public std::exception {
+class StderrLogger : public Logger {
  public:
-  template <class... Args>
-  explicit RaftError(const fmt::CStringRef fmtString, Args... args) {
-    msg_ = fmt::sprintf(fmtString, std::forward<Args>(args)...);
-  }
-
-  virtual ~RaftError() = default;
-
-  virtual const char* what() const noexcept {
-    return msg_.c_str();
-  }
-
- protected:
-  std::string msg_;
+  void Log(LogLevel level, int line, const char* file, const Slice& log) override;
 };
 
 }  // namespace yaraft

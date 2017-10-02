@@ -51,19 +51,17 @@ class Raft {
 
   explicit Raft(Config* conf)
       : c_(conf),
+        id_(conf->id),
         log_(new RaftLog(conf->storage)),
         electionElapsed_(0),
         votedFor_(0),
         pendingConf_(false) {
-    FATAL_NOT_OK(conf->Validate(), "Config::Validate");
-
-    id_ = conf->id;
     step_ = std::bind(&Raft::stepImpl, this, std::placeholders::_1);
 
     pb::HardState hardState;
     auto s = c_->storage->InitialState(&hardState, nullptr);
     if (!s) {
-      LOG(FATAL) << s;
+      LOG(FATAL, s.ToString());
     }
     loadState(hardState);
 
@@ -79,9 +77,9 @@ class Raft {
     std::for_each(std::next(peers.begin()), peers.end(),
                   [&](uint64_t p) { nodeStr += ", " + std::to_string(p); });
 
-    LOG(INFO) << fmt::format(
-        "newRaft {:x} [peers: [{:s}], term: {:d}, commit: {:d}, applied: {:d}, lastindex: {:d}, "
-        "lastterm: {:d}]",
+    FMT_SLOG(
+        INFO,
+        "newRaft %x [peers: [%s], term: %d, commit: %d, applied: %d, lastindex: %d, lastterm: %d]",
         id_, nodeStr, currentTerm_, log_->CommitIndex(), log_->LastApplied(), log_->LastIndex(),
         log_->LastTerm());
   }
@@ -91,9 +89,8 @@ class Raft {
       // local message
     } else if (currentTerm_ > m.term()) {
       // ignore the message
-      LOG(INFO) << fmt::format(
-          "{:x} [term: {:d}] ignored a {:s} message with lower term from {:x} [term: {:d}]", id_,
-          currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
+      FMT_SLOG(INFO, "%x [term: %d] ignored a %s message with lower term from %x [term: %d]", id_,
+               currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
       return Status::OK();
     } else if (currentTerm_ < m.term()) {
       if (m.type() == pb::MsgPreVote) {
@@ -110,9 +107,8 @@ class Raft {
           lead = 0;
         }
 
-        LOG(INFO) << fmt::format(
-            "{:x} [term: {:d}] received a {:s} message with higher term from {:x} [term: {:d}]",
-            id_, currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
+        FMT_SLOG(INFO, "%x [term: %d] received a %s message with higher term from %x [term: %d]",
+                 id_, currentTerm_, pb::MessageType_Name(m.type()), m.from(), m.term());
 
         becomeFollower(m.term(), lead);
       }
@@ -121,7 +117,7 @@ class Raft {
     switch (m.type()) {
       case pb::MsgHup:
         DLOG_ASSERT(role_ != kLeader);
-        LOG(INFO) << id_ << " is starting a new election at term " << currentTerm_;
+        FMT_LOG(INFO, "%x is starting a new election at term %d", id_, currentTerm_);
         if (c_->preVote) {
           campaign(kCampaignPreElection);
         } else {
@@ -209,7 +205,7 @@ class Raft {
     votedFor_ = 0;
     resetRandomizedElectionTimeout();
 
-    LOG(INFO) << id_ << " became follower at term " << currentTerm_;
+    FMT_SLOG(INFO, "%x became follower at term %d", id_, currentTerm_);
   }
 
   void becomePreCandidate() {
@@ -219,7 +215,7 @@ class Raft {
     // Becoming a pre-candidate changes our state,
     // but doesn't change anything else. In particular it does not increase
     // currentTerm_ or change votedFor.
-    LOG(INFO) << id_ << " became pre-candidate at term " << currentTerm_;
+    FMT_SLOG(INFO, "%x became pre-candidate at term %d", id_, currentTerm_);
   }
 
   void becomeCandidate() {
@@ -232,7 +228,7 @@ class Raft {
     }
 
     role_ = kCandidate;
-    LOG(INFO) << id_ << " became candidate at term " << currentTerm_;
+    FMT_SLOG(INFO, "%x became candidate at term %d", id_, currentTerm_);
 
     votedFor_ = id_;
 
@@ -287,7 +283,7 @@ class Raft {
     }
     prs_[id_].MatchIndex(log_->LastIndex());
 
-    LOG(INFO) << id_ << " became leader at term " << currentTerm_;
+    FMT_SLOG(INFO, "%x became leader at term %d", id_, currentTerm_);
   }
 
   void stepLeader(pb::Message& m) {
@@ -302,8 +298,9 @@ class Raft {
         break;
     }
 
-    DLOG_ASSERT(prs_.find(m.from()) != prs_.end())
-        << fmt::format("{:x} no progress available for {:x}", id_, m.from());
+    if (UNLIKELY(prs_.find(m.from()) == prs_.end())) {
+      FMT_SLOG(FATAL, "%x no progress available for %x", id_, m.from());
+    }
 
     switch (m.type()) {
       case pb::MsgAppResp:
@@ -372,19 +369,18 @@ class Raft {
 
   void handleMsgVoteResp(const pb::Message& m) {
     if (m.reject()) {
-      LOG(INFO) << fmt::format("{:x} received {:s} rejection from {:x} at term {:d}", id_,
-                               pb::MessageType_Name(m.type()), m.from(), currentTerm_);
+      FMT_SLOG(INFO, "%x received %s rejection from %x at term %d", id_,
+               pb::MessageType_Name(m.type()), m.from(), currentTerm_);
     } else {
-      LOG(INFO) << fmt::format("{:x} received {:s} from {:x} at term {:d}", id_,
-                               pb::MessageType_Name(m.type()), m.from(), currentTerm_);
+      FMT_SLOG(INFO, "%x received %s from %x at term %d", id_, pb::MessageType_Name(m.type()),
+               m.from(), currentTerm_);
     }
 
     voteGranted_[m.from()] = !m.reject();
 
     int gr = granted();
-    LOG(INFO) << fmt::format(
-        "{:x} [quorum:{:d}] has received {:d} {:s} votes and {:d} vote rejections", id_, quorum(),
-        gr, pb::MessageType_Name(m.type()), voteGranted_.size() - gr);
+    FMT_SLOG(INFO, "%x [quorum:%d] has received %d %s votes and %d vote rejections", id_, quorum(),
+             gr, pb::MessageType_Name(m.type()), voteGranted_.size() - gr);
 
     if (gr >= quorum()) {
       if (m.type() == pb::MsgVoteResp) {
@@ -514,12 +510,15 @@ class Raft {
       // - MsgPreVote: m.Term is the term the node will campaign,
       //   non-zero as we use m.Term to indicate the next term we'll be
       //   campaigning for
-      DLOG_ASSERT(m.term() != 0) << fmt::format(" term should be set when sending {:s}",
-                                                pb::MessageType_Name(m.type()));
+      if (UNLIKELY(m.term() == 0)) {
+        FMT_SLOG(FATAL, "term should be set when sending %s", pb::MessageType_Name(m.type()));
+      }
     } else {
-      DLOG_ASSERT(m.term() == 0) << fmt::format(
-          " term should not be set when sending {:s} (was {:d})", pb::MessageType_Name(m.type()),
-          m.term());
+      if (UNLIKELY(m.term() != 0)) {
+        FMT_SLOG(FATAL, "term should not be set when sending %s (was %d)",
+                 pb::MessageType_Name(m.type()), m.term());
+      }
+
       m.set_term(currentTerm_);
     }
     mails_.push_back(std::move(m));
@@ -527,17 +526,17 @@ class Raft {
 
   void sendVoteResp(const pb::Message& m, bool reject) {
     if (reject) {
-      LOG(INFO) << fmt::format(
-          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] rejected {:s} from {:x} [logterm: "
-          "{:d}, index: {:d}] at term {:d}",
-          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
-          m.from(), m.logterm(), m.index(), currentTerm_);
+      FMT_SLOG(INFO,
+               "%x [logterm: %d, index: %d, vote: %x] rejected %s from %x [logterm: %d, index: %d] "
+               "at term %d",
+               id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+               m.from(), m.logterm(), m.index(), currentTerm_);
     } else {
-      LOG(INFO) << fmt::format(
-          "{:x} [logterm: {:d}, index: {:d}, voteFor: {:x}] cast {:s} for {:x} [logterm: {:d}, "
-          "index: {:d}] at term {:d}",
-          id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
-          m.from(), m.logterm(), m.index(), currentTerm_);
+      FMT_SLOG(INFO,
+               "%x [logterm: %d, index: %d, vote: %x] cast %s for %x [logterm: %d, index: %d] at "
+               "term %d",
+               id_, log_->LastTerm(), log_->LastIndex(), votedFor_, pb::MessageType_Name(m.type()),
+               m.from(), m.logterm(), m.index(), currentTerm_);
     }
 
     // send() will include term=currentTerm into message.
@@ -660,14 +659,12 @@ class Raft {
     pr.RecentActive(true);
 
     if (m.reject()) {
-      DLOG(INFO) << fmt::format(
-          "{:x} received msgApp rejection(lastindex: {:d}) from {:x} for index {:d}", id_,
-          m.rejecthint(), m.from(), m.index());
+      FMT_SLOG(DEBUG, "%x received msgApp rejection(lastindex: %d) from %x for index %d", id_,
+               m.rejecthint(), m.from(), m.index());
 
       if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
         // resume the progress, retry with a lower index.
-        DLOG(INFO) << fmt::format("{:x} decreased progress of {:x} to [{:s}]", id_, m.from(),
-                                  pr.ToString());
+        FMT_SLOG(DEBUG, "{:x} decreased progress of {:x} to [{:s}]", id_, m.from(), pr.ToString());
         pr.Resume();
         if (pr.State() == Progress::StateReplicate) {
           pr.State(Progress::StateProbe);
@@ -807,9 +804,8 @@ class Raft {
       if (peer_id == id_)
         continue;
 
-      LOG(INFO) << fmt::format("{:x} [logterm: {:d}, index: {:d}] sent {:s} to {:x} at term {:d}",
-                               id_, log_->LastTerm(), log_->LastIndex(),
-                               pb::MessageType_Name(voteType), peer_id, term);
+      FMT_SLOG(INFO, "%x [logterm: %d, index: %d] sent %s request to %x at term %d", id_,
+               log_->LastTerm(), log_->LastIndex(), pb::MessageType_Name(voteType), peer_id, term);
       send(m.To(peer_id).v);
     }
   }

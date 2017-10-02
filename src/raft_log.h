@@ -82,7 +82,7 @@ class RaftLog {
     }
 
     // unacceptable error
-    LOG(FATAL) << s.GetStatus();
+    FATAL_NOT_OK(s, "MemoryStorage::Term");
     return 0;
   }
 
@@ -93,9 +93,7 @@ class RaftLog {
       return unstable_.snapshot->metadata().index();
     } else {
       auto s = storage_->LastIndex();
-      if (!s.IsOK()) {
-        LOG(FATAL) << s.GetStatus();
-      }
+      FATAL_NOT_OK(s, "Storage::LastIndex");
       return s.GetValue();
     }
   }
@@ -112,9 +110,7 @@ class RaftLog {
 
   uint64_t LastTerm() const {
     auto s = Term(LastIndex());
-    if (!s.IsOK()) {
-      LOG(FATAL) << s.GetStatus();
-    }
+    FATAL_NOT_OK(s, "RaftLog::Term");
     return s.GetValue();
   }
 
@@ -145,10 +141,10 @@ class RaftLog {
 
     if (begin->index() <= commitIndex_) {
 #ifdef BUILD_TESTS
-      throw RaftError("Append a committed entry at {:d}, committed: {:d}", begin->index(),
+      throw RaftError("entry %d conflict with committed entry [committed(%d)]", begin->index(),
                       commitIndex_);
 #else
-      FMT_LOG(FATAL, "Append a committed entry at {:d}, committed: {:d}", begin->index(),
+      FMT_LOG(FATAL, "entry %d conflict with committed entry [committed(%d)]", begin->index(),
               commitIndex_);
 #endif
     }
@@ -158,10 +154,10 @@ class RaftLog {
   void CommitTo(uint64_t to) {
     if (to > commitIndex_) {
       if (LastIndex() < to) {
-        FMT_LOG(FATAL,
-                "tocommit({:d}) is out of range [LastIndex({:d})]. Was the raft log corrupted, "
-                "truncated, or lost?",
-                to, LastIndex());
+        FMT_SLOG(FATAL,
+                 "tocommit(%d) is out of range [lastIndex(%d)]. Was the raft log corrupted, "
+                 "truncated, or lost?",
+                 to, LastIndex());
       }
       commitIndex_ = to;
     }
@@ -214,10 +210,10 @@ class RaftLog {
     }
 
     uint64_t fi = FirstIndex(), li = LastIndex();
-    if (lo < fi)
-      return Status::Make(Error::LogCompacted);
-    LOG_ASSERT(hi <= li + 1) << fmt::format(" slice[{:d},{:d}) out of bound [{:d},{:d}]", lo, hi,
-                                            fi, li);
+    uint64_t length = LastIndex() + 1 - fi;
+    if (lo < fi || hi > fi + length) {
+      FMT_SLOG(FATAL, "slice[%d,%d) out of bound [%d,%d]", lo, hi, fi, li);
+    }
 
     uint64_t uOffset = unstable_.offset;
 
@@ -303,9 +299,7 @@ class RaftLog {
 
   EntryVec AllEntries() {
     auto s = Entries(FirstIndex(), LastIndex() + 1, std::numeric_limits<uint64_t>::max());
-    if (!s.IsOK()) {
-      DLOG(FATAL) << s.GetStatus();
-    }
+    FATAL_NOT_OK(s, "RaftLog::Entries");
     return s.GetValue();
   }
 

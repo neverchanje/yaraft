@@ -11,6 +11,9 @@ add_library(yaraft
         ${YARAFT_SOURCE_DIR}/pb_utils.cc
         ${YARAFT_SOURCE_DIR}/raw_node.cc
         ${YARAFT_SOURCE_DIR}/status.cc
+        ${YARAFT_SOURCE_DIR}/conf.cc
+        ${YARAFT_SOURCE_DIR}/logging.cc
+        ${YARAFT_SOURCE_DIR}/stderr_logger.cc
         ${YARAFT_PROTO_DIR}/raftpb.pb.cc)
 target_link_libraries(yaraft ${YARAFT_TEST_LINK_LIBS})
 

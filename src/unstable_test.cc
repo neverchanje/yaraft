@@ -18,7 +18,9 @@
 
 using namespace yaraft;
 
-TEST(Unstable, TruncateAndAppend) {
+class UnstableTest : public BaseTest {};
+
+TEST_F(UnstableTest, TruncateAndAppend) {
   struct TestData {
     std::vector<pb::Entry> entries;
     uint64_t offset;
@@ -88,7 +90,7 @@ TEST(Unstable, TruncateAndAppend) {
   }
 }
 
-TEST(Unstable, Restore) {
+TEST_F(UnstableTest, Restore) {
   Unstable u;
   u.entries = {PBEntry().Index(5).Term(1).v};
   u.offset = 6;
@@ -100,7 +102,7 @@ TEST(Unstable, Restore) {
   ASSERT_EQ(u.entries.size(), 0);
 }
 
-TEST(Unstable, MaybeTerm) {
+TEST_F(UnstableTest, MaybeTerm) {
   struct TestData {
     std::vector<pb::Entry> entries;
     uint64_t offset;

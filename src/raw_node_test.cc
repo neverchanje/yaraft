@@ -18,8 +18,10 @@
 
 using namespace yaraft;
 
+class RawNodeTest : public BaseTest {};
+
 // This test ensures that RawNode.Step ignore local message.
-TEST(RawNode, Step) {
+TEST_F(RawNodeTest, Step) {
   for (int i = pb::MessageType_MIN; i <= pb::MessageType_MAX; i++) {
     RawNode rn(newTestConfig(1, {1}, 10, 1, new MemoryStorage()));
     auto s = rn.Step(PBMessage().From(1).To(1).Type(static_cast<pb::MessageType>(i)).v);
@@ -32,7 +34,7 @@ TEST(RawNode, Step) {
   }
 }
 
-TEST(RawNode, Propose) {
+TEST_F(RawNodeTest, Propose) {
   auto memstore = new MemoryStorage();
   RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
   rn.Campaign();
@@ -59,7 +61,7 @@ TEST(RawNode, Propose) {
   ASSERT_EQ(rn.GetInfo().logIndex, 5);
 }
 
-TEST(RawNode, ProposeConfChange) {
+TEST_F(RawNodeTest, ProposeConfChange) {
   auto memstore = new MemoryStorage;
   RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
   ASSERT_OK(rn.Campaign());
@@ -101,7 +103,7 @@ TEST(RawNode, ProposeConfChange) {
 
 // TestRawNodeProposeAddDuplicateNode ensures that two proposes to add the same node should
 // not affect the later propose to add new node.
-TEST(RawNode, ProposeAddDuplicateNode) {
+TEST_F(RawNodeTest, ProposeAddDuplicateNode) {
   auto memstore = new MemoryStorage;
   RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
   ASSERT_OK(rn.Campaign());

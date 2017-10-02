@@ -19,7 +19,7 @@
 
 namespace yaraft {
 
-class RaftTest {
+class RaftTest : public BaseTest {
  public:
   static void TestSendingSnapshotSetPendingSnapshot() {
     auto snap = PBSnapshot().MetaIndex(11).MetaTerm(11).MetaConfState({1, 2}).v;
@@ -125,22 +125,22 @@ class RaftTest {
 
 using namespace yaraft;
 
-TEST(RaftSnap, SendingSnapshotSetPendingSnapshot) {
+TEST_F(RaftTest, SendingSnapshotSetPendingSnapshot) {
   RaftTest::TestSendingSnapshotSetPendingSnapshot();
 }
 
-TEST(RaftSnap, PendingSnapshotPauseReplication) {
+TEST_F(RaftTest, PendingSnapshotPauseReplication) {
   RaftTest::TestPendingSnapshotPauseReplication();
 }
 
-TEST(RaftSnap, SnapshotFailure) {
+TEST_F(RaftTest, SnapshotFailure) {
   RaftTest::TestSnapshotFailure();
 }
 
-TEST(RaftSnap, SnapshotSucceed) {
+TEST_F(RaftTest, SnapshotSucceed) {
   RaftTest::TestSnapshotSucceed();
 }
 
-TEST(RaftSnap, SnapshotAbort) {
+TEST_F(RaftTest, SnapshotAbort) {
   RaftTest::TestSnapshotAbort();
 }

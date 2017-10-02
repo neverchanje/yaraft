@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #include "pb_utils.h"
+#include "logging.h"
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <glog/logging.h>
 
 namespace yaraft {
 
@@ -32,7 +32,7 @@ pb::MessageType GetResponseType(pb::MessageType type) {
     case pb::MsgHeartbeat:
       return pb::MsgHeartbeatResp;
     default:
-      DLOG(FATAL) << pb::MessageType_Name(type) << "is not a request type";
+      D_FMT_LOG(FATAL, "{} is not a request type", pb::MessageType_Name(type));
       return pb::MessageType(0);
   }
 }

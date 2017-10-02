@@ -21,6 +21,8 @@
 
 using namespace yaraft;
 
+class RaftLogTest : public BaseTest {};
+
 uint64_t mustTerm(const RaftLog& log, uint64_t index) {
   auto s = log.Term(index);
   if (!s.IsOK()) {
@@ -29,9 +31,9 @@ uint64_t mustTerm(const RaftLog& log, uint64_t index) {
   return s.GetValue();
 }
 
-TEST(RaftLog, IsUpToDate) {}
+TEST_F(RaftLogTest, IsUpToDate) {}
 
-TEST(RaftLog, Term) {
+TEST_F(RaftLogTest, Term) {
   uint64_t offset = 100;
   uint64_t num = 100;
 
@@ -55,7 +57,7 @@ TEST(RaftLog, Term) {
   }
 }
 
-TEST(RaftLog, TermWithUnstableSnapshot) {
+TEST_F(RaftLogTest, TermWithUnstableSnapshot) {
   uint64_t storageSnapshotIndex = 100;
   uint64_t unstableSnapshotIndex = storageSnapshotIndex + 5;
 
@@ -87,7 +89,7 @@ TEST(RaftLog, TermWithUnstableSnapshot) {
   }
 }
 
-TEST(RaftLog, Append) {
+TEST_F(RaftLogTest, Append) {
   struct TestData {
     EntryVec ents;
 
@@ -121,7 +123,7 @@ TEST(RaftLog, Append) {
   }
 }
 
-TEST(RaftLog, Entries) {
+TEST_F(RaftLogTest, Entries) {
   uint64_t offset = 100;
   uint64_t num = 100;
   uint64_t last = offset + num;
@@ -172,7 +174,7 @@ TEST(RaftLog, Entries) {
 // 	2. Append any new entries not already in the log
 // If the given (index, term) does not match with the existing log:
 // 	return false
-TEST(RaftLog, MaybeAppend) {
+TEST_F(RaftLogTest, MaybeAppend) {
   uint64_t prevIndex = 3;
   uint64_t prevTerm = 3;
 
@@ -233,7 +235,7 @@ TEST(RaftLog, MaybeAppend) {
   }
 }
 
-TEST(RaftLog, Restore) {
+TEST_F(RaftLogTest, Restore) {
   uint64_t index = 1000;
   uint64_t term = 1000;
 
@@ -248,7 +250,7 @@ TEST(RaftLog, Restore) {
   ASSERT_EQ(log.Term(index).GetValue(), term);
 }
 
-TEST(RaftLog, Compaction) {
+TEST_F(RaftLogTest, Compaction) {
   struct TestData {
     uint64_t lastIndex;
     std::vector<uint64_t> compact;
@@ -286,7 +288,7 @@ TEST(RaftLog, Compaction) {
         }
       }
     } catch (std::exception& e) {
-      LOG(ERROR) << e.what();
+      LOG(ERROR, e.what());
       ASSERT_FALSE(t.wallow);
     }
   }

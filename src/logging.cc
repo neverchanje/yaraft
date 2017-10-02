@@ -12,29 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include <stdexcept>
-
-#include <fmt/format.h>
+#include "logging.h"
 
 namespace yaraft {
 
-class RaftError : public std::exception {
- public:
-  template <class... Args>
-  explicit RaftError(const fmt::CStringRef fmtString, Args... args) {
-    msg_ = fmt::sprintf(fmtString, std::forward<Args>(args)...);
-  }
+std::unique_ptr<Logger> raftLogger;
 
-  virtual ~RaftError() = default;
-
-  virtual const char* what() const noexcept {
-    return msg_.c_str();
-  }
-
- protected:
-  std::string msg_;
-};
+void SetLogger(std::unique_ptr<Logger> logger) {
+  raftLogger.swap(logger);
+}
 
 }  // namespace yaraft

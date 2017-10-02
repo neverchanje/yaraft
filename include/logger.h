@@ -14,27 +14,26 @@
 
 #pragma once
 
-#include <stdexcept>
-
-#include <fmt/format.h>
+#include <silly/slice.h>
 
 namespace yaraft {
 
-class RaftError : public std::exception {
+using silly::Slice;
+
+enum LogLevel : unsigned char {
+  DEBUG = 0,
+  INFO,
+  WARNING,
+  ERROR,
+  FATAL,
+
+  NUM_LOG_LEVELS
+};
+
+class Logger {
  public:
-  template <class... Args>
-  explicit RaftError(const fmt::CStringRef fmtString, Args... args) {
-    msg_ = fmt::sprintf(fmtString, std::forward<Args>(args)...);
-  }
-
-  virtual ~RaftError() = default;
-
-  virtual const char* what() const noexcept {
-    return msg_.c_str();
-  }
-
- protected:
-  std::string msg_;
+  virtual ~Logger() = default;
+  virtual void Log(LogLevel level, int line, const char* file, const Slice& log) = 0;
 };
 
 }  // namespace yaraft

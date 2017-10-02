@@ -42,7 +42,12 @@ bool operator!=(const pb::HardState& a, const pb::HardState& b) {
   return !(a == b);
 }
 
-RawNode::RawNode(Config* conf) : raft_(new Raft(conf)), prevHardState_(new pb::HardState) {}
+RawNode::RawNode(Config* conf) : prevHardState_(new pb::HardState) {
+  // validate first to avoid bad config (which may cause crazy segfault).
+  FATAL_NOT_OK(conf->Validate(), "Config::Validate");
+
+  raft_.reset(new Raft(conf));
+}
 
 RawNode::~RawNode() = default;
 

@@ -14,22 +14,45 @@
 
 #pragma once
 
+#include <memory>
+
+#include "logger.h"
+
 #include <fmt/format.h>
-#include <glog/logging.h>
 
-#define FMT_LOG(level, formatStr, args...) LOG(level) << fmt::format(formatStr, ##args)
+#define LOG(level, str) raftLogger->Log(level, __LINE__, __FILE__, str)
 
-#define FMT_SLOG(level, formatStr, args...) LOG(level) << fmt::sprintf(formatStr, ##args)
+#define LOG_ASSERT(expr) (expr) ? void(0) : LOG(FATAL, "Assertion failed: " #expr)
 
-#define D_FMT_LOG(level, formatStr, args...) DLOG(level) << fmt::format(formatStr, ##args)
+#ifndef NDEBUG
+#define DLOG(level, str) LOG(level, str)
+#define DLOG_ASSERT(expr) LOG_ASSERT(expr)
+#else
+#define DLOG(level, str) true ? void(0) : LOG(level, str)
+#define DLOG_ASSERT(expr) true ? void(0) : LOG_ASSERT(expr)
+#endif
 
-#define D_FMT_SLOG(level, formatStr, args...) DLOG(level) << fmt::sprintf(formatStr, ##args)
+#define FMT_LOG(level, formatStr, args...) LOG(level, fmt::format(formatStr, ##args))
+
+#define FMT_SLOG(level, formatStr, args...) LOG(level, fmt::sprintf(formatStr, ##args))
+
+#define D_FMT_LOG(level, formatStr, args...) DLOG(level, fmt::format(formatStr, ##args))
+
+#define D_FMT_SLOG(level, formatStr, args...) DLOG(level, fmt::sprintf(formatStr, ##args))
 
 /// @brief Emit a fatal error if @c to_call returns a bad status.
-#define FATAL_NOT_OK(to_call, fatal_prefix)                  \
-  do {                                                       \
-    const auto& _s = (to_call);                              \
-    if (UNLIKELY(!_s.IsOK())) {                              \
-      LOG(FATAL) << (fatal_prefix) << ": " << _s.ToString(); \
-    }                                                        \
-  } while (0)
+#define FATAL_NOT_OK(to_call, fatal_prefix)                    \
+  do {                                                         \
+    const auto& _s = (to_call);                                \
+    if (UNLIKELY(!_s.IsOK())) {                                \
+      FMT_LOG(FATAL, "{}: {}", (fatal_prefix), _s.ToString()); \
+    }                                                          \
+  } while (0);
+
+namespace yaraft {
+
+extern std::unique_ptr<Logger> raftLogger;
+
+void SetLogger(std::unique_ptr<Logger> logger);
+
+}  // namespace yaraft

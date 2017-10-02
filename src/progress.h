@@ -15,12 +15,13 @@
 
 #pragma once
 
+#include "logging.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <sstream>
 
 #include <fmt/format.h>
-#include <glog/logging.h>
 
 namespace yaraft {
 
@@ -94,7 +95,7 @@ class Progress {
       case StateReplicate:
         return false;
       default:
-        LOG(FATAL) << "unexpected state";
+        LOG(FATAL, "unexpected state");
         break;
     }
   }

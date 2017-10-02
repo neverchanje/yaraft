@@ -22,7 +22,9 @@
 
 using namespace yaraft;
 
-TEST(MemoryStorage, Term) {
+class MemoryStorageTest : public BaseTest {};
+
+TEST_F(MemoryStorageTest, Term) {
   struct TestData {
     uint64_t i;
 
@@ -46,7 +48,7 @@ TEST(MemoryStorage, Term) {
   }
 }
 
-TEST(MemoryStorage, Compact) {
+TEST_F(MemoryStorageTest, Compact) {
   struct TestData {
     uint64_t i;
 
@@ -70,7 +72,7 @@ TEST(MemoryStorage, Compact) {
   }
 }
 
-TEST(MemoryStorage, Entries) {
+TEST_F(MemoryStorageTest, Entries) {
   auto maxUInt64 = std::numeric_limits<uint64_t>::max();
   auto ents = pbEntry(3, 3) + pbEntry(4, 4) + pbEntry(5, 5) + pbEntry(6, 6);
 
@@ -117,7 +119,7 @@ TEST(MemoryStorage, Entries) {
   }
 }
 
-TEST(MemoryStorage, Append) {
+TEST_F(MemoryStorageTest, Append) {
   struct TestData {
     EntryVec entries;
 

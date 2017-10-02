@@ -21,7 +21,7 @@
 
 namespace yaraft {
 
-class RaftPaperTest {
+class RaftPaperTest : public BaseTest {
  public:
   // TestUpdateTermFromMessage tests that if one server’s current term is
   // smaller than the other’s, then it updates its current term to the larger
@@ -724,82 +724,82 @@ class RaftPaperTest {
 
 using namespace yaraft;
 
-TEST(Raft, FollowerUpdateTermFromMessage) {
+TEST_F(RaftPaperTest, FollowerUpdateTermFromMessage) {
   RaftPaperTest::TestUpdateTermFromMessage(Raft::kFollower);
 }
 
-TEST(Raft, CandidateUpdateTermFromMessage) {
+TEST_F(RaftPaperTest, CandidateUpdateTermFromMessage) {
   RaftPaperTest::TestUpdateTermFromMessage(Raft::kCandidate);
 }
 
-TEST(Raft, LeaderUpdateTermFromMessage) {
+TEST_F(RaftPaperTest, LeaderUpdateTermFromMessage) {
   RaftPaperTest::TestUpdateTermFromMessage(Raft::kLeader);
 }
 
-TEST(Raft, StartAsFollower) {
+TEST_F(RaftPaperTest, StartAsFollower) {
   RaftPaperTest::TestStartAsFollower();
 }
 
-TEST(Raft, LeaderBcastBeat) {
+TEST_F(RaftPaperTest, LeaderBcastBeat) {
   RaftPaperTest::TestLeaderBcastBeat();
 }
 
-TEST(Raft, FollowerStartElection) {
+TEST_F(RaftPaperTest, FollowerStartElection) {
   RaftPaperTest::TestNonleaderStartElection(Raft::kFollower);
 }
 
-TEST(Raft, CandidateStartNewElection) {
+TEST_F(RaftPaperTest, CandidateStartNewElection) {
   RaftPaperTest::TestNonleaderStartElection(Raft::kCandidate);
 }
 
-TEST(Raft, Voter) {
+TEST_F(RaftPaperTest, Voter) {
   RaftPaperTest::TestVoter();
 }
 
-TEST(Raft, LeaderOnlyCommitsLogFromCurrentTerm) {
+TEST_F(RaftPaperTest, LeaderOnlyCommitsLogFromCurrentTerm) {
   RaftPaperTest::TestLeaderOnlyCommitsLogFromCurrentTerm();
 }
 
-TEST(Raft, VoteRequest) {
+TEST_F(RaftPaperTest, VoteRequest) {
   RaftPaperTest::TestVoteRequest();
 }
 
-TEST(Raft, FollowerAppendEntries) {
+TEST_F(RaftPaperTest, FollowerAppendEntries) {
   RaftPaperTest::TestFollowerAppendEntries();
 }
 
-TEST(Raft, LeaderCommitPrecedingEntries) {
+TEST_F(RaftPaperTest, LeaderCommitPrecedingEntries) {
   RaftPaperTest::TestLeaderCommitPrecedingEntries();
 }
 
-TEST(Raft, LeaderAcknowledgeCommit) {
+TEST_F(RaftPaperTest, LeaderAcknowledgeCommit) {
   RaftPaperTest::TestLeaderAcknowledgeCommit();
 }
 
-TEST(Raft, CandidateFallback) {
+TEST_F(RaftPaperTest, CandidateFallback) {
   RaftPaperTest::TestCandidateFallback();
 }
 
-TEST(Raft, LeaderStartReplication) {
+TEST_F(RaftPaperTest, LeaderStartReplication) {
   RaftPaperTest::TestLeaderStartReplication();
 }
 
-TEST(Raft, LeaderCommitEntry) {
+TEST_F(RaftPaperTest, LeaderCommitEntry) {
   RaftPaperTest::TestLeaderCommitEntry();
 }
 
-TEST(Raft, FollowerCheckMsgApp) {
+TEST_F(RaftPaperTest, FollowerCheckMsgApp) {
   RaftPaperTest::TestFollowerCheckMsgApp();
 }
 
-TEST(Raft, LeaderElectionInOneRoundRPC) {
+TEST_F(RaftPaperTest, LeaderElectionInOneRoundRPC) {
   RaftPaperTest::TestLeaderElectionInOneRoundRPC();
 }
 
-TEST(Raft, LeaderSyncFollowerLog) {
+TEST_F(RaftPaperTest, LeaderSyncFollowerLog) {
   RaftPaperTest::TestLeaderSyncFollowerLog();
 }
 
-TEST(Raft, VoteFromCandidateWithDifferentTerm) {
+TEST_F(RaftPaperTest, VoteFromCandidateWithDifferentTerm) {
   RaftPaperTest::TestVoteFromCandidateWithDifferentTerm();
 }

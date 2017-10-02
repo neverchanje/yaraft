@@ -37,7 +37,6 @@ class Storage {
   // [FirstIndex()-1, LastIndex()]. The term of the entry before
   // FirstIndex is retained for matching purposes even though the
   // rest of that entry may not be available.
-  // TODO: What is the matching purposes mean?
   virtual StatusWith<uint64_t> Term(uint64_t i) const = 0;
 
   // LastIndex returns the index of the last entry in the log.

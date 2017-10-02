@@ -36,7 +36,7 @@ StatusWith<uint64_t> MemoryStorage::Term(uint64_t i) const {
 }
 
 StatusWith<EntryVec> MemoryStorage::Entries(uint64_t lo, uint64_t hi, uint64_t *maxSize) {
-  DLOG_ASSERT(lo <= hi);
+  LOG_ASSERT(lo <= hi);
 
   std::lock_guard<std::mutex> guard(mu_);
   if (lo <= entries_.begin()->index()) {
@@ -77,10 +77,10 @@ Status MemoryStorage::Compact(uint64_t compactIndex) {
 
   if (compactIndex > lastIndex()) {
 #ifdef BUILD_TESTS
-    throw RaftError("compact {} is out of bound lastindex({})", compactIndex,
+    throw RaftError("compact %d is out of bound lastindex(%d)", compactIndex,
                     LastIndex().GetValue());
 #else
-    FMT_LOG(FATAL, "compact {} is out of bound lastindex({})", compactIndex,
+    FMT_LOG(FATAL, "compact %d is out of bound lastindex(%d)", compactIndex,
             LastIndex().GetValue());
 #endif
   }

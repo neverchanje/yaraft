@@ -19,7 +19,7 @@
 
 namespace yaraft {
 
-class RaftTest {
+class RaftTest : public BaseTest {
  public:
   // Ensure that the Step function ignores the message from old term and does not pass it to the
   // actual stepX function.
@@ -661,118 +661,118 @@ class RaftTest {
 
 using namespace yaraft;
 
-TEST(Raft, StepIgnoreOldTermMsg) {
+TEST_F(RaftTest, StepIgnoreOldTermMsg) {
   RaftTest::TestStepIgnoreOldTermMsg();
 }
 
-TEST(Raft, HandleAppendEntries) {
+TEST_F(RaftTest, HandleAppendEntries) {
   RaftTest::TestHandleMsgApp();
 }
 
-TEST(Raft, StateTransition) {
+TEST_F(RaftTest, StateTransition) {
   RaftTest::TestStateTransition();
 }
 
-TEST(Raft, HandleHeartbeat) {
+TEST_F(RaftTest, HandleHeartbeat) {
   RaftTest::TestHandleHeartbeat();
 }
 
-TEST(Raft, HandleHeartbeatResp) {
+TEST_F(RaftTest, HandleHeartbeatResp) {
   RaftTest::TestHandleHeartbeatResp();
 }
 
-TEST(Raft, LeaderElection) {
+TEST_F(RaftTest, LeaderElection) {
   RaftTest::TestLeaderElection(false);
 }
 
-TEST(Raft, LeaderElectionPreVote) {
+TEST_F(RaftTest, LeaderElectionPreVote) {
   RaftTest::TestLeaderElection(true);
 }
 
-TEST(Raft, LogReplication) {
+TEST_F(RaftTest, LogReplication) {
   RaftTest::TestLogReplication();
 }
 
-TEST(Raft, LeaderCycle) {
+TEST_F(RaftTest, LeaderCycle) {
   RaftTest::TestLeaderCycle(false);
 }
 
-TEST(Raft, LeaderCyclePreVote) {
+TEST_F(RaftTest, LeaderCyclePreVote) {
   RaftTest::TestLeaderCycle(true);
 }
 
-TEST(Raft, Commit) {
+TEST_F(RaftTest, Commit) {
   RaftTest::TestCommit();
 }
 
-TEST(Raft, CampaignWhileLeader) {
+TEST_F(RaftTest, CampaignWhileLeader) {
   RaftTest::TestCampaignWhileLeader();
 }
 
-TEST(Raft, DuelingCandidates) {
+TEST_F(RaftTest, DuelingCandidates) {
   RaftTest::TestDuelingCandidates();
 }
 
-TEST(Raft, DuelingPreCandidates) {
+TEST_F(RaftTest, DuelingPreCandidates) {
   RaftTest::TestDuelingPreCandidates();
 }
 
-TEST(Raft, VoteFromAnyState) {
+TEST_F(RaftTest, VoteFromAnyState) {
   RaftTest::TestVoteFromAnyState(pb::MsgVote);
 }
 
-TEST(Raft, PreVoteFromAnyState) {
+TEST_F(RaftTest, PreVoteFromAnyState) {
   RaftTest::TestVoteFromAnyState(pb::MsgPreVote);
 }
 
-TEST(Raft, SingleNodeCandidate) {
+TEST_F(RaftTest, SingleNodeCandidate) {
   RaftTest::TestSingleNodeCandidate();
 }
 
-TEST(Raft, SingleNodePreCandidate) {
+TEST_F(RaftTest, SingleNodePreCandidate) {
   RaftTest::TestSingleNodePreCandidate();
 }
 
-TEST(Raft, SingleNodeCommit) {
+TEST_F(RaftTest, SingleNodeCommit) {
   RaftTest::TestSingleNodeCommit();
 }
 
-TEST(Raft, Restore) {
+TEST_F(RaftTest, Restore) {
   RaftTest::TestRestore();
 }
 
-TEST(Raft, RestoreIgnoreSnapshot) {
+TEST_F(RaftTest, RestoreIgnoreSnapshot) {
   RaftTest::TestRestoreIgnoreSnapshot();
 }
 
-TEST(Raft, ProvideSnap) {
+TEST_F(RaftTest, ProvideSnap) {
   RaftTest::TestProvideSnap();
 }
 
-TEST(Raft, ProgressResumeByHeartbeatResp) {
+TEST_F(RaftTest, ProgressResumeByHeartbeatResp) {
   RaftTest::TestProgressResumeByHeartbeatResp();
 }
 
-TEST(Raft, ProgressPaused) {
+TEST_F(RaftTest, ProgressPaused) {
   RaftTest::TestProgressPaused();
 }
 
-TEST(Raft, StepConfig) {
+TEST_F(RaftTest, StepConfig) {
   RaftTest::TestStepConfig();
 }
 
-TEST(Raft, RecoverPendingConfig) {
+TEST_F(RaftTest, RecoverPendingConfig) {
   RaftTest::TestRecoverPendingConfig();
 }
 
-TEST(Raft, RecoverDoublePendingConfig) {
+TEST_F(RaftTest, RecoverDoublePendingConfig) {
   RaftTest::TestRecoverDoublePendingConfig();
 }
 
-TEST(Raft, AddNode) {
+TEST_F(RaftTest, AddNode) {
   RaftTest::TestAddNode();
 }
 
-TEST(Raft, RemoveNode) {
+TEST_F(RaftTest, RemoveNode) {
   RaftTest::TestRemoveNode();
 }

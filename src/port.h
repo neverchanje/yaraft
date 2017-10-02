@@ -14,27 +14,22 @@
 
 #pragma once
 
-#include <stdexcept>
-
-#include <fmt/format.h>
-
-namespace yaraft {
-
-class RaftError : public std::exception {
- public:
-  template <class... Args>
-  explicit RaftError(const fmt::CStringRef fmtString, Args... args) {
-    msg_ = fmt::sprintf(fmtString, std::forward<Args>(args)...);
-  }
-
-  virtual ~RaftError() = default;
-
-  virtual const char* what() const noexcept {
-    return msg_.c_str();
-  }
-
- protected:
-  std::string msg_;
-};
-
-}  // namespace yaraft
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
+#define OS_WINDOWS
+#elif defined(__CYGWIN__) || defined(__CYGWIN32__)
+#define OS_CYGWIN
+#elif defined(linux) || defined(__linux) || defined(__linux__)
+#ifndef OS_LINUX
+#define OS_LINUX
+#endif
+#elif defined(macintosh) || defined(__APPLE__) || defined(__APPLE_CC__)
+#define OS_MACOSX
+#elif defined(__FreeBSD__)
+#define OS_FREEBSD
+#elif defined(__NetBSD__)
+#define OS_NETBSD
+#elif defined(__OpenBSD__)
+#define OS_OPENBSD
+#else
+// more platforms?
+#endif

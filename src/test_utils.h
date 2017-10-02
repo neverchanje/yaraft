@@ -21,6 +21,7 @@
 #include "memory_storage.h"
 #include "pb_utils.h"
 #include "raft.h"
+#include "stderr_logger.h"
 
 #include <gtest/gtest.h>
 
@@ -36,7 +37,6 @@ Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, in
   conf->peers = std::move(peers);
   conf->maxSizePerMsg = std::numeric_limits<uint64_t>::max();
   conf->preVote = false;
-  return conf;
 }
 
 Raft* newTestRaft(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
@@ -215,5 +215,12 @@ static uint64_t noLimit = std::numeric_limits<uint64_t>::max();
       FAIL() << "Bad status: " << _s.ToString(); \
     }                                            \
   } while (0)
+
+class BaseTest : public testing::Test {
+ public:
+  BaseTest() {
+    SetLogger(std::unique_ptr<Logger>(new StderrLogger));
+  }
+};
 
 }  // namespace yaraft
