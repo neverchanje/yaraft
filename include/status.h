@@ -36,10 +36,6 @@ class Error {
     ErrorCodesNum
   };
 
-  static inline std::string ToString(unsigned int errorCode) {
-    return toString(errorCode);
-  }
-
   static std::string toString(unsigned int errorCode);
 };
 
