@@ -117,7 +117,7 @@ class Raft {
     switch (m.type()) {
       case pb::MsgHup:
         DLOG_ASSERT(role_ != kLeader);
-        FMT_LOG(INFO, "%x is starting a new election at term %d", id_, currentTerm_);
+        FMT_SLOG(INFO, "%x is starting a new election at term %d", id_, currentTerm_);
         if (c_->preVote) {
           campaign(kCampaignPreElection);
         } else {
@@ -223,7 +223,7 @@ class Raft {
 #ifdef BUILD_TESTS
       throw RaftError("invalid transition [leader -> candidate]");
 #else
-      FMT_LOG(FATAL, "invalid transition [leader -> candidate]");
+      FMT_SLOG(FATAL, "invalid transition [leader -> candidate]");
 #endif
     }
 
@@ -257,7 +257,7 @@ class Raft {
 #ifdef BUILD_TESTS
       throw RaftError("invalid transition [follower -> leader]");
 #else
-      FMT_LOG(FATAL, "invalid transition [follower -> leader]");
+      FMT_SLOG(FATAL, "invalid transition [follower -> leader]");
 #endif
     }
 
@@ -664,7 +664,7 @@ class Raft {
 
       if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
         // resume the progress, retry with a lower index.
-        FMT_SLOG(DEBUG, "{:x} decreased progress of {:x} to [{:s}]", id_, m.from(), pr.ToString());
+        FMT_SLOG(DEBUG, "%x decreased progress of %x to [%s]", id_, m.from(), pr.ToString());
         pr.Resume();
         if (pr.State() == Progress::StateReplicate) {
           pr.State(Progress::StateProbe);
