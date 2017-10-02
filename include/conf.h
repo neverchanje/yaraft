@@ -23,7 +23,8 @@
 namespace yaraft {
 
 class Storage;
-// Config contains the parameters to start a raft.
+
+// Config is the configurations to start a raft node.
 class Config {
  public:
   // id is the identity of the local raft. id cannot be 0.
@@ -65,26 +66,9 @@ class Config {
   // used for testing right now.
   std::vector<uint64_t> peers;
 
-  Status Validate() const {
-    if (id == 0) {
-      return Status::Make(Error::InvalidConfig, "ID cannot be 0");
-    }
+  Config();
 
-    if (heartbeatTick <= 0) {
-      return Status::Make(Error::InvalidConfig, "heartbeat tick must be greater than 0");
-    }
-
-    if (electionTick < heartbeatTick) {
-      return Status::Make(Error::InvalidConfig,
-                          "election tick must be greater than heartbeat tick");
-    }
-
-    if (!storage) {
-      return Status::Make(Error::InvalidConfig, "storage cannot be null");
-    }
-
-    return Status::OK();
-  }
+  Status Validate();
 };
 
 }  // namespace yaraft
