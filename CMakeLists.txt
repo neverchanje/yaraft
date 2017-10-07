@@ -25,12 +25,6 @@ set(CMAKE_PREFIX_PATH ${THIRDPARTY_DIR} ${CMAKE_PREFIX_PATH})
 find_package(Protobuf REQUIRED)
 include_directories(SYSTEM ${PROTOBUF_INCLUDE_DIR})
 
-## GLog
-find_package(GLog REQUIRED)
-include_directories(SYSTEM ${GLOG_INCLUDE_DIR})
-
-find_package(Gflags REQUIRED)
-
 find_library(FMT_LIBRARY fmt PATH ${DEPS_LIB_DIR})
 message("-- Found ${FMT_LIBRARY}")
 

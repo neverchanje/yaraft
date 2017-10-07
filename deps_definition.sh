@@ -10,10 +10,6 @@ PROTOBUF_VERSION=2.6.1
 PROTOBUF_NAME=protobuf-$PROTOBUF_VERSION
 PROTOBUF_SOURCE=$TP_DIR/$PROTOBUF_NAME
 
-GLOG_VERSION=0.3.4
-GLOG_NAME=glog-$GLOG_VERSION
-GLOG_SOURCE=$TP_DIR/$GLOG_NAME
-
 GTEST_VERSION=1.8.0
 GTEST_NAME=googletest-$GTEST_VERSION
 GTEST_SOURCE=$TP_DIR/$GTEST_NAME
@@ -25,10 +21,6 @@ FMT_SOURCE=$TP_DIR/$FMT_NAME
 SILLY_VERSION=`git rev-parse @:silly | cut -c 1-7`
 SILLY_NAME=silly-$SILLY_VERSION
 SILLY_SOURCE=`pwd`/silly
-
-GFLAG_VERSION=2.2.0
-GFLAG_NAME=gflags-$GFLAG_VERSION
-GFLAG_SOURCE=$TP_DIR/$GFLAG_NAME
 
 QINIU_CDN_URL_PREFIX=http://onnzg1pyx.bkt.clouddn.com
 
@@ -95,14 +87,6 @@ fetch_and_expand() {
   echo
 }
 
-build_glog() {
-  echo "Installing glog..."
-  pushd ${GLOG_SOURCE}
-  ./configure --prefix=${TP_BUILD_DIR} --disable-shared
-  make -j4 && make install
-  popd
-}
-
 build_silly() {
   echo "Installing silly..."
   pushd ${SILLY_SOURCE}
@@ -127,21 +111,5 @@ build_fmtlib() {
   mkdir -p build && cd build
   cmake .. -DCMAKE_INSTALL_PREFIX=${TP_BUILD_DIR} -DFMT_TEST=false
   make -j4 && make install
-  popd
-}
-
-build_gflag() {
-  mkdir -p $GFLAG_SOURCE/build
-  pushd $GFLAG_SOURCE/build
-  rm -rf CMakeCache.txt CMakeFiles/
-  cmake \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_POSITION_INDEPENDENT_CODE=On \
-    -DCMAKE_INSTALL_PREFIX=$TP_BUILD_DIR \
-    -DBUILD_SHARED_LIBS=On \
-    -DBUILD_STATIC_LIBS=On \
-    -DREGISTER_INSTALL_PREFIX=Off \
-    $GFLAG_SOURCE
-    make -j8 install
   popd
 }
