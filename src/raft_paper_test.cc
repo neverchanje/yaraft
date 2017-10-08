@@ -40,6 +40,8 @@ class RaftPaperTest : public BaseTest {
         break;
       case Raft::kFollower:
         break;
+      default:
+        break;
     }
 
     r->Step(PBMessage().Term(2).Type(pb::MsgApp).v);

@@ -37,6 +37,7 @@ Config* newTestConfig(uint64_t id, std::vector<uint64_t> peers, int election, in
   conf->peers = std::move(peers);
   conf->maxSizePerMsg = std::numeric_limits<uint64_t>::max();
   conf->preVote = false;
+  return conf;
 }
 
 Raft* newTestRaft(uint64_t id, std::vector<uint64_t> peers, int election, int heartbeat,
