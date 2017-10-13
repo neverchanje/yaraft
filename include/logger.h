@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include <silly/slice.h>
 
 namespace yaraft {
@@ -35,5 +37,7 @@ class Logger {
   virtual ~Logger() = default;
   virtual void Log(LogLevel level, int line, const char* file, const Slice& log) = 0;
 };
+
+void SetLogger(std::unique_ptr<Logger> logger);
 
 }  // namespace yaraft

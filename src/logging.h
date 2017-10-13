@@ -53,6 +53,4 @@ namespace yaraft {
 
 extern std::unique_ptr<Logger> raftLogger;
 
-void SetLogger(std::unique_ptr<Logger> logger);
-
 }  // namespace yaraft

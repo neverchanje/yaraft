@@ -13,10 +13,11 @@
 // limitations under the License.
 
 #include "logging.h"
+#include "stderr_logger.h"
 
 namespace yaraft {
 
-std::unique_ptr<Logger> raftLogger;
+std::unique_ptr<Logger> raftLogger(new StderrLogger);
 
 void SetLogger(std::unique_ptr<Logger> logger) {
   raftLogger.swap(logger);
