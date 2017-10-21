@@ -163,4 +163,8 @@ Status RawNode::ProposeConfChange(const pb::ConfChange& cc) {
           .v);
 }
 
+uint64_t RawNode::Id() const {
+  return raft_->Id();
+}
+
 }  // namespace yaraft

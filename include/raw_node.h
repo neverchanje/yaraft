@@ -63,6 +63,8 @@ class RawNode {
 
   RaftInfo GetInfo() const;
 
+  uint64_t Id() const;
+
  private:
   std::unique_ptr<Raft> raft_;
 

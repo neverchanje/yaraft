@@ -923,7 +923,7 @@ class Raft {
   friend class Network;
   friend class RawNode;
 
-  uint64_t id_;
+  const uint64_t id_;
 
   // Number of ticks since it reached last electionTimeout when it is leader or candidate.
   // Number of ticks since it reached last electionTimeout or received a valid message from
