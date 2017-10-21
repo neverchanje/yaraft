@@ -166,6 +166,10 @@ class RaftLog {
   // MaybeAppend returns false and set newLastIndex=0 if the entries cannot be appended. Otherwise,
   // it returns true and set newLastIndex = last index of new entries = prevLogIndex + len(entries).
   bool MaybeAppend(pb::Message& m, uint64_t* newLastIndex) {
+    if (UNLIKELY(m.entries().empty())) {
+      FMT_LOG(FATAL, "no entries to append [lastindex: {}, msg.index: {}]", LastIndex(), m.index());
+    }
+
     uint64_t prevLogIndex = m.index();
     uint64_t prevLogTerm = m.logterm();
 
@@ -179,8 +183,10 @@ class RaftLog {
         auto begin = m.mutable_entries()->begin();
         auto end = m.mutable_entries()->end();
 
-        // prevLog must be immediately before the new log.
-        LOG_ASSERT(begin->index() == prevLogIndex + 1);
+        if (UNLIKELY(begin->index() != prevLogIndex + 1)) {
+          FMT_LOG(FATAL, "unexpected gap between prevlog and newlog [newlog: {}, prevlog: {}]",
+                  begin->index(), prevLogIndex);
+        }
 
         for (auto& e : m.entries()) {
           if (!HasEntry(e.index(), e.term())) {
