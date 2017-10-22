@@ -144,10 +144,6 @@ class Raft {
     return id_;
   }
 
-  bool IsLeader() const {
-    return role_ == kLeader;
-  }
-
   void Tick() {
     switch (role_) {
       case kLeader:

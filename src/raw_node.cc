@@ -70,7 +70,7 @@ Status RawNode::Step(pb::Message& m) {
 }
 
 Status RawNode::Propose(const silly::Slice& data) {
-  if (!raft_->IsLeader()) {
+  if (!IsLeader()) {
     return Status::Make(Error::ProposeToNonLeader, fmt::format("{} is not leader", raft_->Id()));
   }
 
@@ -107,18 +107,6 @@ Ready* RawNode::GetReady() {
   return rd.release();
 }
 
-RaftInfo RawNode::GetInfo() const {
-  RaftInfo info;
-  info.logIndex = raft_->log_->LastIndex();
-  info.currentLeader = raft_->currentLeader_;
-  info.currentTerm = raft_->currentTerm_;
-  info.commitIndex = raft_->log_->CommitIndex();
-  for (auto e : raft_->prs_) {
-    info.progress[e.first] = RaftProgress(e.second.NextIndex(), e.second.MatchIndex());
-  }
-  return info;
-}
-
 void RawNode::ReportSnapshot(uint64_t id, RawNode::SnapshotStatus status) {
   bool reject = status == kSnapshotFailure;
   raft_->Step(PBMessage().Type(pb::MsgSnapStatus).From(id).To(id).Reject(reject).v);
@@ -150,7 +138,7 @@ pb::ConfState RawNode::ApplyConfChange(const pb::ConfChange& cc) {
 }
 
 Status RawNode::ProposeConfChange(const pb::ConfChange& cc) {
-  if (!raft_->IsLeader()) {
+  if (!IsLeader()) {
     return Status::Make(Error::ProposeToNonLeader, fmt::format("{} is not leader", raft_->Id()));
   }
 
@@ -165,6 +153,26 @@ Status RawNode::ProposeConfChange(const pb::ConfChange& cc) {
 
 uint64_t RawNode::Id() const {
   return raft_->Id();
+}
+
+uint64_t RawNode::CurrentTerm() const {
+  return raft_->Term();
+}
+
+uint64_t RawNode::CommittedIndex() const {
+  return raft_->log_->CommitIndex();
+}
+
+uint64_t RawNode::LastIndex() const {
+  return raft_->log_->LastIndex();
+}
+
+uint64_t RawNode::LeaderHint() const {
+  return raft_->currentLeader_;
+}
+
+bool RawNode::IsLeader() const {
+  return raft_->id_ == raft_->currentLeader_;
 }
 
 }  // namespace yaraft

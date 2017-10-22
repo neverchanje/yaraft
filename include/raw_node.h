@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "raft_info.h"
 #include "status.h"
 
 #include <yaraft/pb/raftpb.pb.h>
@@ -61,9 +60,17 @@ class RawNode {
   // ApplyConfChange applies a config change to the local node.
   pb::ConfState ApplyConfChange(const pb::ConfChange &cc);
 
-  RaftInfo GetInfo() const;
-
   uint64_t Id() const;
+
+  uint64_t CurrentTerm() const;
+
+  uint64_t CommittedIndex() const;
+
+  uint64_t LastIndex() const;
+
+  uint64_t LeaderHint() const;
+
+  bool IsLeader() const;
 
  private:
   std::unique_ptr<Raft> raft_;
