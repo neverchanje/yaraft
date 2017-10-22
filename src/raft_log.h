@@ -166,10 +166,6 @@ class RaftLog {
   // MaybeAppend returns false and set newLastIndex=0 if the entries cannot be appended. Otherwise,
   // it returns true and set newLastIndex = last index of new entries = prevLogIndex + len(entries).
   bool MaybeAppend(pb::Message& m, uint64_t* newLastIndex) {
-    if (UNLIKELY(m.entries().empty())) {
-      FMT_LOG(FATAL, "no entries to append [lastindex: {}, msg.index: {}]", LastIndex(), m.index());
-    }
-
     uint64_t prevLogIndex = m.index();
     uint64_t prevLogTerm = m.logterm();
 
