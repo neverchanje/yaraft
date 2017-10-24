@@ -39,9 +39,6 @@ inline char LogLevelToChar(LogLevel level) {
     case FATAL:
       levelChar = 'F';
       break;
-    case DEBUG:
-      levelChar = 'D';
-      break;
     default:
       fprintf(stderr, "unexpected log level %d", level);
       assert(false);

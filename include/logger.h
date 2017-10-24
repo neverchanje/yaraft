@@ -23,8 +23,7 @@ namespace yaraft {
 using silly::Slice;
 
 enum LogLevel : unsigned char {
-  DEBUG = 0,
-  INFO,
+  INFO = 1,
   WARNING,
   ERROR,
   FATAL,

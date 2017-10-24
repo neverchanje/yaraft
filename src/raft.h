@@ -655,12 +655,12 @@ class Raft {
     pr.RecentActive(true);
 
     if (m.reject()) {
-      FMT_SLOG(DEBUG, "%x received msgApp rejection(lastindex: %d) from %x for index %d", id_,
-               m.rejecthint(), m.from(), m.index());
+      D_FMT_SLOG(INFO, "%x received msgApp rejection(lastindex: %d) from %x for index %d", id_,
+                 m.rejecthint(), m.from(), m.index());
 
       if (pr.MaybeDecrTo(m.index(), m.rejecthint())) {
         // resume the progress, retry with a lower index.
-        FMT_SLOG(DEBUG, "%x decreased progress of %x to [%s]", id_, m.from(), pr.ToString());
+        D_FMT_SLOG(INFO, "%x decreased progress of %x to [%s]", id_, m.from(), pr.ToString());
         pr.Resume();
         if (pr.State() == Progress::StateReplicate) {
           pr.State(Progress::StateProbe);
