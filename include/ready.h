@@ -44,6 +44,9 @@ struct Ready {
   // when the snapshot has been received or has failed by calling ReportSnapshot.
   std::vector<pb::Message> messages;
 
+  // current leader of the raft group
+  uint64_t currentLeader;
+
  public:
   bool IsEmpty() const {
     return (!hardState) && entries.empty() && (!snapshot) && messages.empty();
