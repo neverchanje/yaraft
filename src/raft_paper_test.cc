@@ -291,6 +291,7 @@ class RaftPaperTest : public BaseTest {
             {pbEntry(2, 3), pbEntry(3, 4)},
         },
         {0, 0, {pbEntry(1, 1)}, {pbEntry(1, 1), pbEntry(2, 2)}},
+        {0, 0, {pbEntry(1, 3)}, {pbEntry(1, 3)}, {pbEntry(1, 3)}},
     };
 
     for (auto t : tests) {

@@ -47,6 +47,7 @@ class MemoryStorage : public Storage {
     return lastIndex();
   }
 
+  // ERROR: LogCompacted, OutOfBound.
   virtual StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t *maxSize) override;
 
   virtual StatusWith<pb::Snapshot> Snapshot() const override {
@@ -147,5 +148,6 @@ class MemoryStorage : public Storage {
 };
 
 using MemStoreUptr = std::unique_ptr<MemoryStorage>;
+using MemStoreSptr = std::shared_ptr<MemoryStorage>;
 
 }  // namespace yaraft
