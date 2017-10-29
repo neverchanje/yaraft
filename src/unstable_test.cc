@@ -170,3 +170,40 @@ TEST_F(UnstableTest, MaybeTerm) {
     ASSERT_EQ(u.MaybeTerm(t.index), t.wterm);
   }
 }
+
+TEST_F(UnstableTest, CopyTo) {
+  struct TestData {
+    EntryVec ents;
+    uint64_t lo, hi;
+    int maxSize;
+
+    EntryVec wents;
+  } tests[] = {
+      // no space enough
+      {{pbEntry(2, 2)}, 1, 3, 0, {}},
+
+      // space only for 1 entry
+      {{pbEntry(2, 2)}, 1, 3, pbEntry(1, 1).ByteSize(), {pbEntry(1, 1)}},
+
+      // space enough for 2 entries
+      {{pbEntry(2, 2)}, 1, 3, pbEntry(1, 1).ByteSize() + pbEntry(2, 2).ByteSize(), {pbEntry(1, 1)}},
+
+      {{pbEntry(2, 2), pbEntry(3, 3)},
+       2,
+       4,
+       static_cast<int>(noLimit),
+       {pbEntry(2, 2), pbEntry(3, 3)}},
+
+      {{pbEntry(2, 2), pbEntry(3, 3)}, 3, 4, static_cast<int>(noLimit), {pbEntry(3, 3)}},
+  };
+
+  for (auto t : tests) {
+    Unstable u;
+    u.entries = {pbEntry(1, 1)};
+    std::copy(t.ents.begin(), t.ents.end(), std::back_inserter(u.entries));
+    u.offset = 1;
+
+    EntryVec result;
+    u.CopyTo(result, t.lo, t.hi, static_cast<uint64_t>(t.maxSize));
+  }
+}

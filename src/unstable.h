@@ -69,6 +69,7 @@ struct Unstable {
       offset = after;
     } else {
       // offset < after < offset + entries.size
+      FMT_SLOG(INFO, "truncate the unstable entries before index %d", after);
       entries.resize(after - offset + std::distance(begin, end));
       for (int i = after - offset; i < entries.size(); i++) {
         entries[i].Swap(&(*begin++));
@@ -82,6 +83,39 @@ struct Unstable {
     entries.clear();
     snapshot.reset(new pb::Snapshot);
     snapshot->Swap(&snap);
+  }
+
+  void CopyTo(EntryVec& vec, uint64_t lo, uint64_t hi, uint64_t maxSize) {
+    MustCheckOutOfBounds(lo, hi);
+
+    auto begin = lo - offset + entries.begin();
+    auto end = entries.end();
+    if (hi - offset < entries.size()) {
+      end = entries.begin() + hi - offset;
+    }
+
+    uint64_t size = 0;
+    auto it = begin;
+    for (; it != end; it++) {
+      size += it->ByteSize();
+      if (size > maxSize)
+        break;
+    }
+    end = it;
+
+    std::copy(begin, end, std::back_inserter(vec));
+  }
+
+  // u.offset <= lo <= hi <= u.offset+len(u.offset)
+  void MustCheckOutOfBounds(uint64_t lo, uint64_t hi) const {
+    if (UNLIKELY(lo > hi)) {
+      FMT_SLOG(FATAL, "invalid unstable.slice %d > %d", lo, hi);
+    }
+
+    uint64_t upper = offset + entries.size();
+    if (lo < offset || hi > upper) {
+      FMT_SLOG(FATAL, "unstable.slice[%d,%d) out of bound [%d,%d]", lo, hi, offset, upper);
+    }
   }
 
  public:
