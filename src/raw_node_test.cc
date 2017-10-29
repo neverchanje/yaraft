@@ -38,8 +38,8 @@ TEST_F(RawNodeTest, Propose) {
   auto memstore = new MemoryStorage();
   RawNode rn(newTestConfig(1, {1}, 10, 1, memstore));
   rn.Campaign();
-  ASSERT_EQ(rn.GetInfo().currentTerm, 1);
-  ASSERT_EQ(rn.GetInfo().currentLeader, 1);
+  ASSERT_EQ(rn.CurrentTerm(), 1);
+  ASSERT_EQ(rn.LeaderHint(), 1);
 
   for (int i = 0; i < 4; i++) {
     rn.Propose("a");
@@ -57,8 +57,8 @@ TEST_F(RawNodeTest, Propose) {
   ASSERT_TRUE(rd->IsEmpty());
 
   // one no-op for election, 4 proposed logs
-  ASSERT_EQ(rn.GetInfo().commitIndex, 5);
-  ASSERT_EQ(rn.GetInfo().logIndex, 5);
+  ASSERT_EQ(rn.CommittedIndex(), 5);
+  ASSERT_EQ(rn.LastIndex(), 5);
 }
 
 TEST_F(RawNodeTest, ProposeConfChange) {
@@ -80,7 +80,7 @@ TEST_F(RawNodeTest, ProposeConfChange) {
 
   {
     std::set<uint64_t> actual;
-    auto pr = rn.GetInfo().progress;
+    auto pr = rn.ProgressMap();
     for (auto& e : pr) {
       actual.insert(e.first);
     }
@@ -130,7 +130,7 @@ TEST_F(RawNodeTest, ProposeAddDuplicateNode) {
 
   {
     std::set<uint64_t> actual;
-    auto pr = rn.GetInfo().progress;
+    auto pr = rn.ProgressMap();
     for (auto& e : pr) {
       actual.insert(e.first);
     }

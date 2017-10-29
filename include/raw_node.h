@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "status.h"
 
 #include <yaraft/pb/raftpb.pb.h>
@@ -23,6 +25,14 @@ namespace yaraft {
 class Raft;
 class Config;
 class Ready;
+
+struct RaftProgress {
+  RaftProgress(uint64_t next, uint64_t match) : nextIndex(next), matchIndex(match) {}
+  RaftProgress() : nextIndex(0), matchIndex(0) {}
+
+  uint64_t nextIndex;
+  uint64_t matchIndex;
+};
 
 class RawNode {
  public:
@@ -60,6 +70,8 @@ class RawNode {
   // ApplyConfChange applies a config change to the local node.
   pb::ConfState ApplyConfChange(const pb::ConfChange &cc);
 
+  // feel free to call this function without lock protection, since the Id
+  // never changes.
   uint64_t Id() const;
 
   uint64_t CurrentTerm() const;
@@ -70,7 +82,11 @@ class RawNode {
 
   uint64_t LeaderHint() const;
 
-  bool IsLeader() const;
+  bool IsLeader() const {
+    return LeaderHint() == Id();
+  }
+
+  std::unordered_map<uint64_t, RaftProgress> ProgressMap();
 
  private:
   std::unique_ptr<Raft> raft_;

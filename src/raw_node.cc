@@ -171,8 +171,12 @@ uint64_t RawNode::LeaderHint() const {
   return raft_->currentLeader_;
 }
 
-bool RawNode::IsLeader() const {
-  return raft_->id_ == raft_->currentLeader_;
+std::unordered_map<uint64_t, RaftProgress> RawNode::ProgressMap() {
+  std::unordered_map<uint64_t, RaftProgress> result;
+  for (auto e : raft_->prs_) {
+    result[e.first] = RaftProgress(e.second.NextIndex(), e.second.MatchIndex());
+  }
+  return result;
 }
 
 }  // namespace yaraft
