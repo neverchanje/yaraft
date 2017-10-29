@@ -138,6 +138,10 @@ void StderrLogger::Log(LogLevel level, int line, const char* file, const Slice& 
   fmt::fprintf(stderr, "%c%s.%ld %5u %s:%d] %s\n", LogLevelToChar(level),
                fmt::format("{:%m%d %H:%M:%S}", *localtime(&now)), usecs, GetTID(), basename, line,
                log.RawData());
+
+  if (level == FATAL) {
+    abort();
+  }
 }
 
 }  // namespace yaraft
