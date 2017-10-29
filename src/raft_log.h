@@ -154,13 +154,46 @@ class RaftLog {
   void CommitTo(uint64_t to) {
     if (to > commitIndex_) {
       if (LastIndex() < to) {
+#ifdef BUILD_TESTS
+        throw RaftError(
+            "tocommit(%d) is out of range [lastIndex(%d)]. Was the raft log corrupted, "
+            "truncated, or lost?",
+            to, LastIndex());
+#else
         FMT_SLOG(FATAL,
                  "tocommit(%d) is out of range [lastIndex(%d)]. Was the raft log corrupted, "
                  "truncated, or lost?",
                  to, LastIndex());
+#endif
       }
       commitIndex_ = to;
     }
+  }
+
+  // FindConflict finds the index of the conflict.
+  // It returns the first pair of conflicting entries between the existing
+  // entries and the given entries, if there are any.
+  // If there is no conflicting entries, and the existing entries contains
+  // all the given entries, `end` will be returned.
+  // If there is no conflicting entries, but the given entries contains new
+  // entries, the iterator of the first new entry will be returned.
+  // An entry is considered to be conflicting if it has the same index but
+  // a different term.
+  // The first entry MUST have an index equal to the argument 'from'.
+  // The index of the given entries MUST be continuously increasing.
+  EntriesIterator FindConflict(EntriesIterator begin, EntriesIterator end) {
+    for (auto it = begin; it != end; it++) {
+      if (!HasEntry(it->index(), it->term())) {
+        if (it->index() <= LastIndex()) {
+          FMT_SLOG(INFO, "found conflict at index %d [existing term: %d, conflicting term: %d]",
+                   it->index(), ZeroTermOnErrCompacted(it->index()), it->term());
+        }
+        return it;
+      }
+    }
+
+    // returns `end` if no conflict found
+    return end;
   }
 
   // MaybeAppend returns false and set newLastIndex=0 if the entries cannot be appended. Otherwise,
@@ -180,18 +213,14 @@ class RaftLog {
         auto end = m.mutable_entries()->end();
 
         if (UNLIKELY(begin->index() != prevLogIndex + 1)) {
-          FMT_LOG(FATAL, "unexpected gap between prevlog and newlog [newlog: {}, prevlog: {}]",
+          FMT_LOG(ERROR, "unexpected gap between prevlog and newlog [newlog: {}, prevlog: {}]",
                   begin->index(), prevLogIndex);
         }
 
-        for (auto& e : m.entries()) {
-          if (!HasEntry(e.index(), e.term())) {
-            break;
-          }
-          begin++;
+        auto conflicted = FindConflict(begin, end);
+        if (conflicted != end) {
+          Append(conflicted, end);
         }
-
-        Append(begin, end);
       }
       return true;
     }
@@ -201,49 +230,65 @@ class RaftLog {
 
   StatusWith<EntryVec> Entries(uint64_t lo, uint64_t maxSize) {
     uint64_t lastIdx = LastIndex();
+    // TODO: test this
+    if (lo > LastIndex()) {
+      return EntryVec();
+    }
     return Entries(lo, lastIdx + 1, maxSize);
+  }
+
+  // the caller MUST be RaftLog::Entries(uint64_t lo, uint64_t hi, uint64_t maxSize)
+  Status MustCheckOutOfBounds(uint64_t lo, uint64_t hi) {
+    if (lo > hi) {
+      FMT_SLOG(FATAL, "invalid slice %d > %d", lo, hi);
+    }
+
+    uint64_t fi = FirstIndex();
+    if (lo < fi) {
+      return Status::Make(Error::LogCompacted, "[RaftLog::MustCheckOutOfBound]");
+    }
+
+    uint64_t li = LastIndex();
+    uint64_t length = li + 1 - fi;
+    if (lo < fi || hi > fi + length) {
+      FMT_SLOG(FATAL, "slice[%d,%d) out of bound [%d,%d]", lo, hi, fi, li);
+    }
+
+    return Status::OK();
   }
 
   // Returns a slice of log entries from lo through hi-1, inclusive.
   // FirstIndex <= lo < hi <= LastIndex + 1
   StatusWith<EntryVec> Entries(uint64_t lo, uint64_t hi, uint64_t maxSize) {
-    if (lo > hi) {
+    RETURN_NOT_OK_APPEND(MustCheckOutOfBounds(lo, hi), "[RaftLog::Entries]");
+    if (lo == hi) {
       return EntryVec();
     }
 
-    uint64_t fi = FirstIndex(), li = LastIndex();
-    uint64_t length = LastIndex() + 1 - fi;
-    if (lo < fi || hi > fi + length) {
-      FMT_SLOG(FATAL, "slice[%d,%d) out of bound [%d,%d]", lo, hi, fi, li);
-    }
-
     uint64_t uOffset = unstable_.offset;
-
     EntryVec ret;
+
+    // retrieve from memory storage
     if (lo < uOffset) {
       auto s = storage_->Entries(lo, std::min(hi, uOffset), &maxSize);
-      if (!s.IsOK()) {
-        return s.GetStatus();
+
+      if (s.GetStatus().Code() == Error::LogCompacted) {
+        return s;
+      } else {
+        FATAL_NOT_OK(s, "[RaftLog::Entries]");
       }
       ret = std::move(s.GetValue());
+
+      // check if ret has reached the size limitation
+      if (ret.size() < std::min(hi, uOffset) - lo) {
+        return ret;
+      }
     }
 
+    // retrieve from unstable
     if (hi > uOffset) {
-      auto begin = std::max(lo, uOffset) - uOffset + unstable_.entries.begin();
-      auto end = unstable_.entries.end();
-      uint64_t size = 0;
-
-      int64_t remains = hi - lo - ret.size();
-      auto it = begin;
-      for (; it != end && remains > 0; it++) {
-        size += it->ByteSize();
-        if (size > maxSize)
-          break;
-        remains--;
-      }
-      end = it;
-
-      std::copy(begin, end, std::back_inserter(ret));
+      lo = std::max(lo, uOffset);
+      unstable_.CopyTo(ret, lo, hi, maxSize);
     }
 
     return ret;
@@ -268,7 +313,8 @@ class RaftLog {
       if (st.GetStatus().Code() == Error::LogCompacted) {
         return 0;
       }
-      FMT_LOG(FATAL, "fail to get term for index: {}, error: {}", index, st.ToString());
+      FMT_LOG(FATAL, "fail to get term for index: {}, error: {}, last_index: {}", index,
+              st.ToString(), LastIndex());
     }
     return st.GetValue();
   }
@@ -300,7 +346,7 @@ class RaftLog {
   /// Used with caution
 
   EntryVec AllEntries() {
-    auto s = Entries(FirstIndex(), LastIndex() + 1, std::numeric_limits<uint64_t>::max());
+    auto s = Entries(FirstIndex(), std::numeric_limits<uint64_t>::max());
     FATAL_NOT_OK(s, "RaftLog::Entries");
     return s.GetValue();
   }
@@ -310,6 +356,8 @@ class RaftLog {
   }
 
  private:
+  friend class RaftLogTest;
+
   // storage contains all stable entries since the last snapshot.
   std::unique_ptr<Storage> storage_;
 
