@@ -2,7 +2,7 @@
 
 set -e
 
-TEST_DIR=`dirname $BASH_SOURCE`/build/src
+TEST_DIR=`dirname $BASH_SOURCE`/cmake-build-debug/src
 
 function run()
 {
@@ -23,3 +23,4 @@ run pb_utils_test
 run progress_test
 run raw_node_test
 run raft_snap_test
+run raft_read_only_test

@@ -12,6 +12,7 @@ add_library(yaraft
         ${YARAFT_SOURCE_DIR}/conf.cc
         ${YARAFT_SOURCE_DIR}/logging.cc
         ${YARAFT_SOURCE_DIR}/stderr_logger.cc
+        ${YARAFT_SOURCE_DIR}/read_only.cc
         ${YARAFT_PROTO_DIR}/raftpb.pb.cc)
 target_link_libraries(yaraft ${YARAFT_TEST_LINK_LIBS})
 
@@ -39,4 +40,5 @@ if(${BUILD_TEST})
     ADD_YARAFT_TEST(unstable_test)
     ADD_YARAFT_TEST(raw_node_test)
     ADD_YARAFT_TEST(raft_snap_test)
+    ADD_YARAFT_TEST(raft_read_only_test)
 endif()

@@ -50,7 +50,6 @@ struct Network {
     for (auto r : prs) {
       peers_[r->Id()] = r;
     }
-    size_ = prs.size();
   }
 
   ~Network() {
@@ -71,6 +70,11 @@ struct Network {
         continue;
       }
 
+      // ignore the message
+      if (ignoreTypes_.find(m.type()) != ignoreTypes_.end()) {
+        continue;
+      }
+
       peers_[to]->Step(m);
       for (auto& msg : peers_[to]->mails_) {
         msgs_.push_back(msg);
@@ -85,6 +89,10 @@ struct Network {
 
   void Propose(uint64_t id, std::string data = "somedata") {
     Send(PBMessage().From(id).To(id).Type(pb::MsgProp).Entries({PBEntry().Data(data).v}).v);
+  }
+
+  void ReadIndex(uint64_t id, std::string ctx) {
+    Send(PBMessage().From(id).To(id).Type(pb::MsgReadIndex).Entries({PBEntry().Data(ctx).v}).v);
   }
 
   static Network* New(uint64_t size) {
@@ -151,15 +159,26 @@ struct Network {
     cutMap_.erase(cutMap_.find(n2));
   }
 
+  // ignore a specified type of message
+  void Ignore(pb::MessageType type) {
+    ignoreTypes_.insert(type);
+  }
+
+  // recover the whole network to normal
+  void Recover() {
+    ignoreTypes_.clear();
+    cutMap_.clear();
+  }
+
  private:
   std::unordered_map<uint64_t, Raft*> peers_;
-  size_t size_;
 
   // to => Message
-  std::unordered_map<uint64_t, std::list<pb::Message>> mailTo_;
   std::list<pb::Message> msgs_;
 
   std::unordered_map<uint64_t, uint64_t> cutMap_;
+
+  std::unordered_set<pb::MessageType> ignoreTypes_;
 };
 
 pb::Entry pbEntry(uint64_t index, uint64_t term) {

@@ -30,6 +30,7 @@ std::string Error::toString(unsigned int errorCode) {
     DUMB_ERROR_TO_STRING(LogCompacted);
     DUMB_ERROR_TO_STRING(StepLocalMsg);
     DUMB_ERROR_TO_STRING(StepPeerNotFound);
+    DUMB_ERROR_TO_STRING(NotLeader);
     default:
       FMT_LOG(FATAL, "Unknown error code: {}", code);
       return "";

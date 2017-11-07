@@ -88,6 +88,11 @@ struct PBMessage {
     v.set_allocated_snapshot(s);
     return *this;
   }
+
+  PBMessage& Context(std::string* ctx) {
+    v.set_allocated_context(ctx);
+    return *this;
+  }
 };
 
 using EntriesIterator = ::google::protobuf::RepeatedPtrField<::yaraft::pb::Entry>::iterator;
@@ -112,6 +117,12 @@ struct PBEntry {
 
   PBEntry& Data(const silly::Slice& data) {
     v.set_data(data.RawData(), data.Len());
+    return *this;
+  }
+
+  PBEntry& Data(std::string& data) {
+    auto s = new std::string(std::move(data));
+    v.set_allocated_data(s);
     return *this;
   }
 };

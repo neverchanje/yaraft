@@ -16,6 +16,8 @@
 
 #include <unordered_map>
 
+#include "read_only.h"
+#include "slice.h"
 #include "status.h"
 
 #include <yaraft/pb/raftpb.pb.h>
@@ -50,7 +52,7 @@ class RawNode {
   Status Campaign();
 
   // Propose proposes data be appended to the raft log.
-  Status Propose(const silly::Slice &data);
+  Status Propose(const Slice &data);
 
   // GetReady returns the current point-in-time state of this RawNode,
   // and returns null when there's no state ready (to be persisted or transferred).
@@ -69,6 +71,13 @@ class RawNode {
 
   // ApplyConfChange applies a config change to the local node.
   pb::ConfState ApplyConfChange(const pb::ConfChange &cc);
+
+  // ReadIndex requests a read state. The read state will be set in ready.
+  // Read State has a read index. Once the application advances further than the read
+  // index, any linearizable read requests issued before the read request can be
+  // processed safely. The read state will have the same rctx attached.
+  // TODO(wutao1): using uint64 instead of std::string to serialize read index.
+  Status ReadIndex(std::string &ctx);
 
   // feel free to call this function without lock protection, since the Id
   // never changes.

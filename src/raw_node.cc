@@ -42,6 +42,13 @@ bool operator!=(const pb::HardState& a, const pb::HardState& b) {
   return !(a == b);
 }
 
+#define RETURN_IF_NOT_LEADER                                                               \
+  do {                                                                                     \
+    if (!IsLeader()) {                                                                     \
+      return Status::Make(Error::NotLeader, fmt::format("{} is not leader", raft_->Id())); \
+    }                                                                                      \
+  } while (0)
+
 RawNode::RawNode(Config* conf) : prevHardState_(new pb::HardState) {
   // validate first to avoid bad config (which may cause crazy segfault).
   FATAL_NOT_OK(conf->Validate(), "Config::Validate");
@@ -70,9 +77,7 @@ Status RawNode::Step(pb::Message& m) {
 }
 
 Status RawNode::Propose(const silly::Slice& data) {
-  if (!IsLeader()) {
-    return Status::Make(Error::ProposeToNonLeader, fmt::format("{} is not leader", raft_->Id()));
-  }
+  RETURN_IF_NOT_LEADER;
 
   uint64_t id = raft_->Id(), term = raft_->Term();
   auto e = PBEntry().Data(data).v;
@@ -138,9 +143,7 @@ pb::ConfState RawNode::ApplyConfChange(const pb::ConfChange& cc) {
 }
 
 Status RawNode::ProposeConfChange(const pb::ConfChange& cc) {
-  if (!IsLeader()) {
-    return Status::Make(Error::ProposeToNonLeader, fmt::format("{} is not leader", raft_->Id()));
-  }
+  RETURN_IF_NOT_LEADER;
 
   return raft_->Step(
       PBMessage()
@@ -177,6 +180,16 @@ std::unordered_map<uint64_t, RaftProgress> RawNode::ProgressMap() {
     result[e.first] = RaftProgress(e.second.NextIndex(), e.second.MatchIndex());
   }
   return result;
+}
+
+Status RawNode::ReadIndex(std::string& ctx) {
+  // no forwarding supports.
+  // no follower read supports.
+  RETURN_IF_NOT_LEADER;
+
+  raft_->Step(PBMessage().Type(pb::MsgReadIndex).Entries({PBEntry().Data(ctx).v}).v);
+
+  return Status::OK();
 }
 
 }  // namespace yaraft

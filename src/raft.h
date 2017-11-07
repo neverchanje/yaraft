@@ -28,6 +28,7 @@
 #include "pb_utils.h"
 #include "progress.h"
 #include "raft_log.h"
+#include "read_only.h"
 
 namespace yaraft {
 
@@ -290,6 +291,9 @@ class Raft {
       case pb::MsgProp:
         handleMsgProp(m);
         return;
+      case pb::MsgReadIndex:
+        handleMsgReadIndex(m);
+        return;
       default:
         break;
     }
@@ -545,11 +549,11 @@ class Raft {
     return true;
   }
 
-  void bcastHeartbeat() {
+  void bcastHeartbeat(const std::string* ctx = nullptr) {
     for (const auto& e : prs_) {
       if (id_ == e.first)
         continue;
-      sendHeartbeat(e.first);
+      sendHeartbeat(e.first, ctx);
     }
   }
 
@@ -626,7 +630,7 @@ class Raft {
     send(m.v);
   }
 
-  void sendHeartbeat(uint64_t to) {
+  void sendHeartbeat(uint64_t to, const std::string* ctx = nullptr) {
     // Attach the commit as min(to.matched, raftlog.committed).
     // When the leader sends out heartbeat message,
     // the receiver(follower) might not be matched with the leader
@@ -638,6 +642,10 @@ class Raft {
                  .To(to)
                  .Type(pb::MsgHeartbeat)
                  .Commit(std::min(prs_[to].MatchIndex(), log_->CommitIndex()));
+
+    if (ctx != nullptr) {
+      m.Context(new std::string(*ctx));
+    }
     send(m.v);
   }
 
@@ -648,6 +656,13 @@ class Raft {
     if (pr.MatchIndex() < log_->LastIndex()) {
       sendAppend(m.from());
     }
+
+    int ackCount = readOnly_.RecvAck(m);
+    if (ackCount < quorum()) {
+      return;
+    }
+
+    readOnly_.Advance(m, &readStates_);
   }
 
   void handleMsgAppResp(const pb::Message& m) {
@@ -684,14 +699,14 @@ class Raft {
     }
   }
 
-  void handleHeartbeat(const pb::Message& m) {
+  void handleHeartbeat(pb::Message& m) {
     DLOG_ASSERT(role_ != StateRole::kLeader);
 
     currentLeader_ = m.from();
     electionElapsed_ = 0;
 
     log_->CommitTo(m.commit());
-    send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).v);
+    send(PBMessage().To(m.from()).Type(pb::MsgHeartbeatResp).Context(m.release_context()).v);
   }
 
   void handleAppendEntries(pb::Message& m) {
@@ -913,6 +928,25 @@ class Raft {
                m.from(), pr.ToString());
   }
 
+  void handleMsgReadIndex(pb::Message& m) {
+    if (quorum() > 1) {
+      if (log_->ZeroTermOnErrCompacted(log_->CommitIndex()) != Term()) {
+        // Reject read only request when this leader has not committed any log entry at its term.
+        // (raft thesis 6.4)
+        return;
+      }
+
+      readOnly_.AddRequest(log_->CommitIndex(), m);
+      bcastHeartbeat(&m.entries(0).data());
+    } else {
+      // read directly from current node if quorum == 1
+      ReadState readState;
+      readState.index = log_->CommitIndex();
+      readState.requestCtx = std::move(*m.mutable_entries(0)->release_data());
+      readStates_.emplace_back(readState);
+    }
+  }
+
  private:
   friend class RaftTest;
   friend class RaftPaperTest;
@@ -959,6 +993,9 @@ class Raft {
   // peer id -> Progress
   using PeerMap = std::unordered_map<uint64_t, Progress>;
   PeerMap prs_;
+
+  ReadOnly readOnly_;
+  std::vector<ReadState> readStates_;
 };
 
 using RaftUPtr = std::unique_ptr<Raft>;

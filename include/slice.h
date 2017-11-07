@@ -14,34 +14,10 @@
 
 #pragma once
 
-#include <cassert>
-
-#include <silly/status.h>
+#include <silly/slice.h>
 
 namespace yaraft {
 
-class Error {
- public:
-  enum ErrorCodes {
-    OK,
-
-    OutOfBound,
-    InvalidConfig,
-    LogCompacted,
-    StepLocalMsg,
-    StepPeerNotFound,
-    SnapshotUnavailable,
-    NotLeader,
-
-    ErrorCodesNum
-  };
-
-  static std::string toString(unsigned int errorCode);
-};
-
-typedef silly::Status<Error> Status;
-
-template <typename T>
-using StatusWith = silly::StatusWith<Status, T>;
+using Slice = silly::Slice;
 
 }  // namespace yaraft

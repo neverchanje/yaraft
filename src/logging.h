@@ -19,17 +19,24 @@
 #include "logger.h"
 
 #include <fmt/format.h>
+#include <silly/likely.h>
 
 #define LOG(level, str) raftLogger->Log(level, __LINE__, __FILE__, str)
 
 #define LOG_ASSERT(expr) (expr) ? void(0) : LOG(FATAL, "Assertion failed: " #expr)
+#define LOG_ASSERT_S(expr, msg) \
+  if (UNLIKELY(!(expr))) {      \
+    DLOG(FATAL, msg);           \
+  }
 
 #ifndef NDEBUG
 #define DLOG(level, str) LOG(level, str)
 #define DLOG_ASSERT(expr) LOG_ASSERT(expr)
+#define DLOG_ASSERT_S(expr, msg) LOG_ASSERT_S(expr, msg)
 #else
 #define DLOG(level, str) true ? void(0) : LOG(level, str)
 #define DLOG_ASSERT(expr) true ? void(0) : LOG_ASSERT(expr)
+#define DLOG_ASSERT_S(expr, msg) LOG_ASSERT_S(expr, msg)
 #endif
 
 #define FMT_LOG(level, formatStr, args...) LOG(level, fmt::format(formatStr, ##args))
