@@ -178,7 +178,7 @@ struct Network {
 
   std::unordered_map<uint64_t, uint64_t> cutMap_;
 
-  std::unordered_set<pb::MessageType> ignoreTypes_;
+  std::set<pb::MessageType> ignoreTypes_;
 };
 
 pb::Entry pbEntry(uint64_t index, uint64_t term) {

@@ -2,7 +2,7 @@
 
 set -e
 
-TEST_DIR=`dirname $BASH_SOURCE`/cmake-build-debug/src
+TEST_DIR=`dirname $BASH_SOURCE`/build/src
 
 function run()
 {

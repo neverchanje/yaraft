@@ -12,7 +12,7 @@ yaraft is a C++11 port of [etcd/raft](https://github.com/coreos/etcd/tree/master
 - [x] Log Compaction / InstallSnapshot
 - [ ] Flow Control
 - [x] Single-Node Cluster
-- [ ] Read-only
+- [x] Lineariable Read
 - [ ] Leader Transfer
 - [x] Reconfiguration
 
