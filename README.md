@@ -43,8 +43,6 @@ Read [docs/index.md](docs/index.md) for more details.
 
 The public interfaces are under include/*.
 
-yaraft provides identical APIs as etcd/raft, if you are familiar with the latter,
-
 - **include/conf.h**: The configuration to control over the behavior of raft state machine.
 
 - **include/raw_node.h**: Main interface for controlling over raft state machine.
