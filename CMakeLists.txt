@@ -21,6 +21,11 @@ set(THIRDPARTY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/third_parties)
 # Look in thirdparty prefix paths before anywhere else for system dependencies.
 set(CMAKE_PREFIX_PATH ${THIRDPARTY_DIR} ${CMAKE_PREFIX_PATH})
 
+execute_process(COMMAND ${CMAKE_SOURCE_DIR}/install_deps_if_necessary.sh RESULT_VARIABLE THIRDPARTY_SCRIPT_RESULT)
+if (NOT (${THIRDPARTY_SCRIPT_RESULT} EQUAL 0))
+    message(FATAL_ERROR "Thirdparty was built unsuccessfully, terminating.")
+endif ()
+
 ## Protobuf
 find_package(Protobuf REQUIRED)
 include_directories(SYSTEM ${PROTOBUF_INCLUDE_DIR})
