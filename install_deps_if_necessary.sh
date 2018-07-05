@@ -2,9 +2,8 @@
 
 set -e
 
-TP_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
-
-source ${TP_DIR}/deps_definition.sh
+PROJECT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+source ${PROJECT_DIR}/deps_definition.sh
 
 echo "Installing necessary dependencies for building yaraft..."
 

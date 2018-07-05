@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-BUILD_DIR=`pwd`/build
-TP_DIR="`pwd`/third_parties"
-TP_BUILD_DIR="$BUILD_DIR/third_parties"
-TP_STAMP_DIR="$TP_BUILD_DIR/stamp"
-PROTO_FILES_DIR=`pwd`/pb
+PROJECT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
+BUILD_DIR=$PROJECT_DIR/build
+TP_DIR=$PROJECT_DIR/third_parties
+TP_BUILD_DIR=$BUILD_DIR/third_parties
+TP_STAMP_DIR=$TP_BUILD_DIR/stamp
 
 PROTOBUF_VERSION=2.6.1
 PROTOBUF_NAME=protobuf-$PROTOBUF_VERSION
@@ -20,7 +20,7 @@ FMT_SOURCE=$TP_DIR/$FMT_NAME
 
 SILLY_VERSION=`git rev-parse @:silly | cut -c 1-7`
 SILLY_NAME=silly-$SILLY_VERSION
-SILLY_SOURCE=`pwd`/silly
+SILLY_SOURCE=$PROJECT_DIR/silly
 
 QINIU_CDN_URL_PREFIX=http://onnzg1pyx.bkt.clouddn.com
 
