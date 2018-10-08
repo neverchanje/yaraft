@@ -1,0 +1,5 @@
+---
+BasedOnStyle: Google
+FixNamespaceComments: true
+ColumnLimit: 0
+...

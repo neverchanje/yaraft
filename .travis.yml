@@ -1,0 +1,68 @@
+language: cpp
+sudo: required
+dist: trusty
+
+branches:
+  only:
+  - master
+
+install:
+- sudo apt-get -y install libboost-dev flex bison libtool autoconf automake build-essential
+- bash install_deps_if_necessary.sh
+
+matrix:
+  include:
+  # g++ 6.0 on Linux with C++14
+  - env: COMPILER=g++-6.0 BUILD=Release STANDARD=14
+    compiler: gcc
+    addons:
+      apt:
+        update: true
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - g++-6
+
+  # clang 6.0 on Linux with C++14
+  - env: COMPILER=clang++-6.0 BUILD=Debug STANDARD=14
+    compiler: clang
+    addons:
+      apt:
+        update: true
+        packages:
+        - clang-6.0
+        sources:
+        - ubuntu-toolchain-r-test
+        - llvm-toolchain-trusty
+        - llvm-toolchain-trusty-6.0
+
+  # clang 4.0 on Linux with C++11
+  - env: COMPILER=clang++-4.0 BUILD=Debug STANDARD=11
+    compiler: clang
+    addons:
+      apt:
+        update: true
+        packages:
+        - clang-4.0
+        sources:
+        - ubuntu-toolchain-r-test
+        - llvm-toolchain-trusty
+        - llvm-toolchain-trusty-4.0
+
+  # g++ 4.8 on Linux with C++11
+  - env: COMPILER=g++-4.8 BUILD=Debug STANDARD=11
+    compiler: gcc
+
+  # g++ 4.4 on Linux with C++11
+  - env: COMPILER=g++-4.4 BUILD=Debug STANDARD=11
+    compiler: gcc
+    addons:
+      apt:
+        update: true
+        packages:
+        - g++-4.4
+        sources:
+        - ubuntu-toolchain-r-test
+
+script:
+  ./run_tests.sh

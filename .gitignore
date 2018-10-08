@@ -1,0 +1,8 @@
+.idea
+.vscode
+build/
+.ycm_extra_conf.py
+.color_coded
+third_parties/
+cmake-build-debug
+gcov-report
