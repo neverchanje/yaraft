@@ -64,5 +64,9 @@ matrix:
         sources:
         - ubuntu-toolchain-r-test
 
+before_script:
+  - if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then export CXX=${COMPILER}; fi
+  - ${CXX} --version
+
 script:
   ./run_tests.sh
