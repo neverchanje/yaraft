@@ -12,8 +12,8 @@ install:
 
 matrix:
   include:
-  # g++ 6.0 on Linux with C++14
-  - env: COMPILER=g++-6.0 BUILD=Release STANDARD=14
+  # g++ 6.0 on Linux with C++11
+  - env: COMPILER=g++-6.0 BUILD=Release STANDARD=11
     compiler: gcc
     addons:
       apt:
