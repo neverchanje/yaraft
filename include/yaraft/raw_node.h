@@ -21,7 +21,6 @@
 #include <yaraft/read_only.h>
 #include <yaraft/ready.h>
 #include <yaraft/status.h>
-#include <yaraft/string_view.h>
 
 namespace yaraft {
 

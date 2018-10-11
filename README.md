@@ -13,30 +13,6 @@ No RPC, no WAL storage, no multi-threaded environment. It has nothing more than 
 so that we can test it in a deterministic way. For state machines with the same state, the same state machine 
 input should always generate the same state machine output.
 
-yaraft is also the internal state-machine of [consensus-yaraft](https://github.com/neverchanje/consensus-yaraft),
-a highly reliable log storage library. The latter gives a full example of how to use yaraft to replicate logs.
-
-## Features
-
-yaraft doesn't support the [full list of features](https://github.com/coreos/etcd/tree/master/raft#features) 
-included in etcd/raft.
-
-- [x] Leader election
-- [x] Log replication
-- [x] Log Compaction / InstallSnapshot
-- [x] Membership changes
-- [ ] Leader Transfer
-- [x] Linearizable read-only queries
-- [x] Pipelining
-- [ ] Flow Control
-- [x] Batching Raft messages
-- [x] Batching log entries
-- [ ] Proposal forwarding from followers to leader
-- [ ] CheckQuorum
-- [x] PreVote
-
-Read [docs/features.md](docs/features.md) for more information.
-
 ## APIs
 
 Read [docs/index.md](docs/index.md) for more details.
@@ -51,16 +27,13 @@ The public interfaces are under include/*.
 
 - **include/ready.h**: The output of the state machine.
 
-- **src/yaraft/pb/**: The protobuf messages sent and received by yaraft. Read [docs/message_types.md](docs/message_types.md) for more information.
+- **src/yaraft/thrift/**: The thrift messages sent and received by yaraft. Read [docs/message_types.md](docs/message_types.md) for more information.
 
 - **include/logger.h**: Logger is the interface for writing log messages. You can customize the
 logging mechanism by implementing the interface. By default logs are simply written to stderr.
 
-- **include/status.h**: Status is returned from many of the public interfaces and is used to
+- **include/errors.h**: `error_s` is returned from many of the public interfaces and is used to
 report success and various kinds of errors.
-
-- **include/slice.h**: Slice is a [std::string_view(c++17)](http://en.cppreference.com/w/cpp/string/basic_string_view)
-equivalent.
 
 ## Building from source
 
@@ -70,33 +43,13 @@ bash install_deps_if_neccessary.sh
 cd build && cmake .. && make && make install
 ```
 
-### Running unit tests
-
-Before running the unit tests of yaraft, you must change the option of 
-cmake and rebuild the project:
+### Running the tests
 
 ```bash
-cd build
-cmake .. -DBUILD_TEST=On
-make -j8
+$ BUILD=Debug STANDARD=11 ENABLE_GCOV=false ./run_tests.sh
 ```
 
-you can use [run-tests.sh](run-tests.sh) to run all tests in once.
-
-## RoadMap
-
-- Thrift Support: See [this](docs/index.md) for more details. 
-
-- Introduce [Jepsen](http://jepsen.io/) testing
-
-- Optimizations:
-  - Since the original code was written in Go, which doesn't care much about
-  object copies mostly, we may need some optimization on reducing the copies.
-
-## Contributing
-
-If you'd like to contribute, please follow the standard github best practices:
-fork, fix, commit and send pull request for review.
+you can run [run_gcov.sh](run_gcov.sh) to generate the coverage report.
 
 ## Contacts
 

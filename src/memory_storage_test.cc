@@ -157,6 +157,33 @@ class MemoryStorageTest : public BaseTest {
     }
   }
 
+  void TestStorageCreateSnapshot() {
+    auto ents = {newEntry(3, 3), newEntry(4, 4), newEntry(5, 5)};
+    auto cs = idl::ConfState().nodes({1, 2, 3});
+    std::string data = "data";
+
+    struct TestData {
+      uint64_t i;
+
+      error_s werr;
+      idl::Snapshot wsnap;
+      int wlen;
+    } tests[] = {
+        {4, error_s::ok(), idl::Snapshot().metadata_term(4).metadata_index(4).metadata_conf_state(cs).data(data)},
+        {5, error_s::ok(), idl::Snapshot().metadata_term(5).metadata_index(5).metadata_conf_state(cs).data(data)},
+    };
+
+    MemStoreUptr s(new MemoryStorage());
+
+    for (auto t : tests) {
+      MemStoreUptr storage(new MemoryStorage());
+      storage->ents_ = ents;
+      auto errWithSnap = storage->CreateSnapshot(t.i, &cs, data);
+      ASSERT_EQ(errWithSnap.get_error(), t.werr);
+      ASSERT_EQ(errWithSnap.get_value(), t.wsnap);
+    }
+  }
+
   void TestStorageAppend() {
     auto ents = idl::EntryVec{newEntry(3, 3), newEntry(4, 4), newEntry(5, 5)};
     struct TestData {
@@ -251,6 +278,10 @@ TEST_F(MemoryStorageTest, FirstIndex) {
 
 TEST_F(MemoryStorageTest, Compact) {
   TestStorageCompact();
+}
+
+TEST_F(MemoryStorageTest, CreateSnapshot) {
+  TestStorageCreateSnapshot();
 }
 
 TEST_F(MemoryStorageTest, Append) {
