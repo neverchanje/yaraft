@@ -12,8 +12,8 @@ install:
 
 matrix:
   include:
-  # g++ 6.0 on Linux with C++11
-  - env: COMPILER=g++-6 BUILD=Release STANDARD=11
+  # g++ 5.0 on Linux with C++11
+  - env: COMPILER=g++-5 BUILD=Release STANDARD=11
     compiler: gcc
     addons:
       apt:
@@ -21,7 +21,7 @@ matrix:
         sources:
         - ubuntu-toolchain-r-test
         packages:
-        - g++-6
+        - g++-5
 
   # clang 6.0 on Linux with C++14
   - env: COMPILER=clang++-6.0 BUILD=Debug STANDARD=14
