@@ -53,17 +53,6 @@ matrix:
   - env: COMPILER=g++-4.8 BUILD=Debug STANDARD=11
     compiler: gcc
 
-  # g++ 4.4 on Linux with C++11
-  - env: COMPILER=g++-4.4 BUILD=Debug STANDARD=11
-    compiler: gcc
-    addons:
-      apt:
-        update: true
-        packages:
-        - g++-4.4
-        sources:
-        - ubuntu-toolchain-r-test
-
 before_script:
   - if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then export CXX=${COMPILER}; fi
   - ${CXX} --version
