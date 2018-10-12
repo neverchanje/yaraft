@@ -75,7 +75,7 @@ error_s MemoryStorage::ApplySnapshot(idl::Snapshot snap) {
 
 error_with<idl::Snapshot> MemoryStorage::CreateSnapshot(uint64_t i,
                                                         idl::ConfState *cs,
-                                                        string_view data) {
+                                                        std::string data) {
   std::lock_guard<std::mutex> guard(mu_);
   if (i <= snapshot_.metadata_index()) {
     return ErrSnapOutOfDate;
@@ -91,8 +91,8 @@ error_with<idl::Snapshot> MemoryStorage::CreateSnapshot(uint64_t i,
   snapshot_.metadata_term(ents_[i - offset].term());
   if (cs != nullptr) {
     snapshot_.metadata_conf_state(*cs);
-    delete cs;
   }
+  snapshot_.data(std::move(data));
   return snapshot_;
 }
 

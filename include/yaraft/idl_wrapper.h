@@ -404,6 +404,12 @@ struct Snapshot {
   }
   ConfState metadata_conf_state() const { return {v->metadata.conf_state}; }
 
+  Snapshot &data(std::string s) {
+    v->data = std::move(s);
+    v->__isset.data = true;
+    return *this;
+  }
+
   friend std::ostream &operator<<(std::ostream &os, const Snapshot &s) {
     return os << *s.v;
   }

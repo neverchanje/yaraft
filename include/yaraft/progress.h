@@ -29,16 +29,42 @@ class Inflights;
 // progresses of all followers, and sends entries to the follower based on its progress.
 class Progress {
  public:
-  Progress();
-  ~Progress();
-
-  Progress(Progress &&) = default;
-  Progress &operator=(Progress &&) = default;
-
   enum StateType { kStateProbe = 0,
                    kStateReplicate,
                    kStateSnapshot };
 
+  ~Progress();
+
+  Progress();
+
+  Progress(Progress &&) = default;
+  Progress &operator=(Progress &&) = default;
+
+  // == getter == //
+
+  uint64_t Next() const {
+    return next_;
+  }
+  uint64_t Match() const {
+    return match_;
+  }
+  StateType State() {
+    return state_;
+  }
+  bool Paused() {
+    return paused_;
+  }
+  uint64_t PendingSnapshot() const {
+    return pendingSnapshot_;
+  }
+  bool RecentActive() {
+    return recentActive_;
+  }
+  bool IsLearner() {
+    return isLearner_;
+  }
+
+ private:
   void resetState(StateType state);
 
   void becomeProbe() {
@@ -152,6 +178,7 @@ class Progress {
 
  private:
   friend class Raft;
+  friend class Network;
   friend class RaftSnapTest;
   friend class RaftTest;
   friend class RaftFlowControlTest;

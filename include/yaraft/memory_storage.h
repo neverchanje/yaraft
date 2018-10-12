@@ -82,7 +82,7 @@ class MemoryStorage : public Storage {
   // If any configuration changes have been made since the last compaction,
   // the result of the last ApplyConfChange must be passed in.
   error_with<idl::Snapshot> CreateSnapshot(uint64_t i, idl::ConfState *cs,
-                                           string_view data);
+                                           std::string data);
 
   // Compact discards all log entries prior to compactIndex.
   // It is the application's responsibility to not attempt to compact an index
