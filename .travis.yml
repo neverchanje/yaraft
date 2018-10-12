@@ -54,6 +54,7 @@ matrix:
     compiler: gcc
 
 before_script:
+  - ulimit -c unlimited -S
   - if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then export CXX=${COMPILER}; fi
   - ${CXX} --version
 
