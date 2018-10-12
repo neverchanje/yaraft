@@ -42,9 +42,12 @@ cmake .. -DENABLE_GCOV=${ENABLE_GCOV} -DCMAKE_BUILD_TYPE=${BUILD} -DCMAKE_CXX_ST
 make -j4 yaraft_test
 cd src
 ./yaraft_test
-if [ $? -ne 0 ]
-then
-    echo "ERROR: running tests failed"
+if [ $? -ne 0 ]; then
+    echo "run yaraft_test failed"
+    if [ -f core ]; then
+        echo "---- gdb ./yaraft_test core ----"
+        gdb ./yaraft_test core -ex "thread apply all bt" -ex "set pagination 0" -batch
+    fi
     exit 1
 else
     echo "Running tests succeed"
