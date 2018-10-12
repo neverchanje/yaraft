@@ -7,7 +7,7 @@ branches:
   - master
 
 install:
-- sudo apt-get -y install libboost-dev flex bison libtool autoconf automake build-essential
+- sudo apt-get -y install libboost-dev flex bison libtool autoconf automake build-essential gdb
 - bash install_deps_if_necessary.sh
 
 matrix:
